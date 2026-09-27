@@ -1,0 +1,25 @@
+# Exclusiones ripgrep, también sin repositorio Git. No son controles de acceso.
+.vs/
+.idea/
+artifacts/
+**/bin/
+**/obj/
+**/Generated Files/
+coverage/
+TestResults/
+logs/
+tmp/
+*.log
+*.user
+*.suo
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+settings.json
+notified-cards.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12

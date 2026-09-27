@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\TrelloNotifier\Models\*.cs" Link="Models\%(Filename)%(Extension)" />
+    <Compile Include="..\TrelloNotifier\Services\ReminderSchedule.cs" Link="Services\ReminderSchedule.cs" />
+    <Compile Include="..\TrelloNotifier\Services\SettingsStore.cs" Link="Services\SettingsStore.cs" />
+    <Compile Include="..\TrelloNotifier\Services\DueCardMonitor.cs" Link="Services\DueCardMonitor.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Roslyn ya forma parte del SDK .NET 9; solo se usa en los guards de arquitectura. -->
+    <Reference Include="Microsoft.CodeAnalysis">
+      <HintPath>$(MSBuildBinPath)\Roslyn\bincore\Microsoft.CodeAnalysis.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp">
+      <HintPath>$(MSBuildBinPath)\Roslyn\bincore\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
