@@ -2,58 +2,122 @@
     x:Class="TrelloNotifier.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Foreground="{ThemeResource AppTextPrimaryBrush}"
     Loaded="Page_Loaded">
-    <ScrollViewer x:Name="SettingsPanel" IsEnabled="False">
-        <StackPanel Spacing="22" MaxWidth="620" HorizontalAlignment="Left">
-            <StackPanel Spacing="4">
+    <ScrollViewer x:Name="SettingsPanel" IsEnabled="False" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="20" MaxWidth="760" Padding="0,0,12,24">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup>
+                    <VisualState x:Name="CompactSettings">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="SettingsActions.Orientation" Value="Vertical" />
+                            <Setter Target="NotifyBeforeNumberBox.(Grid.ColumnSpan)" Value="2" />
+                            <Setter Target="PollIntervalNumberBox.(Grid.Row)" Value="1" />
+                            <Setter Target="PollIntervalNumberBox.(Grid.Column)" Value="0" />
+                            <Setter Target="PollIntervalNumberBox.(Grid.ColumnSpan)" Value="2" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="WideSettings">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="800" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+
+            <StackPanel Spacing="6" Margin="0,0,0,4">
                 <TextBlock Text="Configuración" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Conecta tu cuenta y define cuándo deseas recibir el aviso." Opacity="0.7" TextWrapping="Wrap" />
+                <TextBlock Text="Tu conexión, tus recordatorios y tu espacio de trabajo."
+                           Style="{StaticResource SecondaryTextStyle}" />
             </StackPanel>
 
             <Border Style="{StaticResource PanelStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Conexión" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBox x:Name="ApiBaseUrlTextBox" Header="URL base de la API" PlaceholderText="https://api.trello.com" />
-                    <TextBox x:Name="ApiKeyTextBox" Header="API key" PlaceholderText="Tu API key de Trello" />
-                    <PasswordBox x:Name="TokenPasswordBox" Header="Token" PlaceholderText="Tu token de autorización" />
-                    <TextBlock Text="Las credenciales son opcionales cuando utilizas una URL simulada." Opacity="0.65" TextWrapping="Wrap" />
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">
+                            <FontIcon Glyph="&#xE71B;" FontSize="18" Foreground="{ThemeResource AppAccentTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Text="Conexión" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Vincula tu cuenta de Trello o un servidor de pruebas." Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBox x:Name="ApiBaseUrlTextBox" Header="URL base de la API" PlaceholderText="https://api.trello.com"
+                             Style="{StaticResource InputTextBoxStyle}" />
+                    <TextBox x:Name="ApiKeyTextBox" Header="API key" PlaceholderText="Tu API key de Trello"
+                             Style="{StaticResource InputTextBoxStyle}" />
+                    <PasswordBox x:Name="TokenPasswordBox" Header="Token" PlaceholderText="Tu token de autorización"
+                                 Style="{StaticResource InputPasswordBoxStyle}" />
+                    <TextBlock Text="Las credenciales son opcionales cuando utilizas una URL simulada." Style="{StaticResource CaptionTextStyle}" />
                     <HyperlinkButton Content="Obtener API key y token en Trello" NavigateUri="https://trello.com/app-key" Padding="0" />
                 </StackPanel>
             </Border>
 
             <Border Style="{StaticResource PanelStyle}">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Monitor" Style="{StaticResource SectionTitleStyle}" />
-                    <NumberBox x:Name="NotifyBeforeNumberBox" Header="Avisar con esta anticipación (minutos)" Minimum="1" Maximum="10080" SpinButtonPlacementMode="Compact" />
-                    <NumberBox x:Name="PollIntervalNumberBox" Header="Comprobar cada (minutos)" Minimum="1" Maximum="1440" SpinButtonPlacementMode="Compact" />
-                    <ComboBox x:Name="RepeatReminderComboBox" Header="Repetir recordatorios cada">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">
+                            <FontIcon Glyph="&#xE787;" FontSize="18" Foreground="{ThemeResource AppAccentTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Text="Monitor" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Define la anticipación y la frecuencia de tus avisos." Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="12">
+                        <NumberBox x:Name="NotifyBeforeNumberBox" Header="Anticipación (minutos)" Minimum="1" Maximum="10080"
+                                   MinHeight="40" SpinButtonPlacementMode="Compact" />
+                        <NumberBox x:Name="PollIntervalNumberBox" Grid.Column="1" Header="Comprobar cada (minutos)" Minimum="1" Maximum="1440"
+                                   MinHeight="40" SpinButtonPlacementMode="Compact" />
+                    </Grid>
+                    <ComboBox x:Name="RepeatReminderComboBox" Header="Repetir recordatorios cada" Style="{StaticResource InputComboBoxStyle}">
                         <ComboBoxItem Content="Nunca" Tag="0" />
                         <ComboBoxItem Content="15 minutos" Tag="15" />
                         <ComboBoxItem Content="30 minutos" Tag="30" />
                         <ComboBoxItem Content="60 minutos" Tag="60" />
                     </ComboBox>
-                    <TextBlock Text="El primer aviso se envía al detectar la tarjeta. Las repeticiones se envían en la primera comprobación tras cumplirse el intervalo, también al pulsar Comprobar ahora." Opacity="0.65" TextWrapping="Wrap" />
-                    <CheckBox x:Name="IncludeOverdueCheckBox" Content="Incluir tarjetas vencidas pendientes" />
-                    <TextBlock Text="Las vencidas se recuerdan cada 2 horas desde su último aviso. Nunca desactiva también estas repeticiones. Si hay varias tarjetas para avisar, se muestra un resumen." Opacity="0.65" TextWrapping="Wrap" />
-                    <CheckBox x:Name="SoundCheckBox" Content="Reproducir sonido en las notificaciones" />
+                    <TextBlock Text="El primer aviso se envía al detectar la tarjeta. Las repeticiones se envían en la primera comprobación tras cumplirse el intervalo, también al pulsar Comprobar ahora."
+                               Style="{StaticResource CaptionTextStyle}" />
+                    <Border BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                        <StackPanel Spacing="10">
+                            <CheckBox x:Name="IncludeOverdueCheckBox" Content="Incluir tarjetas vencidas pendientes" />
+                            <TextBlock Text="Las vencidas se recuerdan cada 2 horas desde su último aviso. Nunca desactiva también estas repeticiones. Si hay varias tarjetas para avisar, se muestra un resumen."
+                                       Style="{StaticResource CaptionTextStyle}" />
+                            <CheckBox x:Name="SoundCheckBox" Content="Reproducir sonido en las notificaciones" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 
             <Border Style="{StaticResource PanelStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Apariencia" Style="{StaticResource SectionTitleStyle}" />
-                    <ComboBox x:Name="ThemeComboBox" Header="Tema" SelectionChanged="Theme_SelectionChanged">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">
+                            <FontIcon Glyph="&#xE790;" FontSize="18" Foreground="{ThemeResource AppAccentTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Text="Apariencia" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Un espacio cómodo, de día o de noche." Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                    <ComboBox x:Name="ThemeComboBox" Header="Tema" SelectionChanged="Theme_SelectionChanged"
+                              Style="{StaticResource InputComboBoxStyle}">
                         <ComboBoxItem Content="Usar configuración de Windows" Tag="Default" />
                         <ComboBoxItem Content="Claro" Tag="Light" />
                         <ComboBoxItem Content="Oscuro" Tag="Dark" />
                     </ComboBox>
+                    <TextBlock Text="El tema se aplica al seleccionarlo. Guarda los cambios para conservar tu preferencia."
+                               Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
             </Border>
 
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,24">
-                <Button Content="Guardar cambios" Style="{StaticResource AccentButtonStyle}" Click="Save_Click" />
-                <Button Content="Probar conexión" Click="TestConnection_Click" />
-                <Button Content="Probar notificación" Click="TestNotification_Click" />
+            <StackPanel x:Name="SettingsActions" Orientation="Horizontal" Spacing="12">
+                <Button Content="Guardar cambios" Style="{StaticResource PrimaryActionButtonStyle}" Click="Save_Click" />
+                <Button Content="Probar conexión" Style="{StaticResource ActionButtonStyle}" Click="TestConnection_Click" />
+                <Button Content="Probar notificación" Style="{StaticResource ActionButtonStyle}" Click="TestNotification_Click" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

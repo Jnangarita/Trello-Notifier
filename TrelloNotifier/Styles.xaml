@@ -5,18 +5,106 @@
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
     </ResourceDictionary.MergedDictionaries>
 
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#F4F6FA" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#EBEFF5" />
+            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#DCE3ED" />
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#192B46" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#52647C" />
+            <SolidColorBrush x:Key="AppAccentTextBrush" Color="#175CD3" />
+            <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="#EBF2FF" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#10151E" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#151C27" />
+            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#1B2432" />
+            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#354358" />
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#F2F5FA" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#B7C4D8" />
+            <SolidColorBrush x:Key="AppAccentTextBrush" Color="#A6C9FF" />
+            <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="#233A5B" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppAccentTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="OverlayCornerRadius">12</CornerRadius>
+
     <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
-        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontSize" Value="30" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+        <Setter Property="FontSize" Value="19" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="CaptionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+        <Setter Property="FontSize" Value="12" />
     </Style>
     <Style x:Key="PanelStyle" TargetType="Border">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="Background" Value="{ThemeResource AppPanelBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppPanelBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="20" />
+    </Style>
+    <Style x:Key="AccentBadgeStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource AppAccentSurfaceBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <!-- Se conservan las plantillas WinUI para foco, hover, pulsado y deshabilitado. -->
+    <Style x:Key="ActionButtonStyle" TargetType="Button">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style x:Key="PrimaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style x:Key="InputPasswordBoxStyle" TargetType="PasswordBox">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style x:Key="InputComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="12,9,36,9" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="CardListItemStyle" TargetType="ListViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+        <Setter Property="CornerRadius" Value="12" />
     </Style>
 </ResourceDictionary>

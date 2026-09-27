@@ -97,6 +97,15 @@ estado vacío y conservación del texto al refrescar. Verificar el nombre del
 tablero debajo de cada título, también con nombres largos y datos ausentes.
 El pipeline no demuestra que Windows haya mostrado un toast correctamente.
 
+Si cambian los estilos, alternar **Claro**, **Oscuro** y **Usar configuración de
+Windows** desde Apariencia y volver al dashboard. Comprobar fondos, texto secundario,
+insignias, desplegables, InfoBar y estados de foco, hover y deshabilitado. Revisar
+también un tema de contraste de Windows. Redimensionar a ambos lados de 800 px
+(acciones/filtros compactos) y 1100 px (panel de navegación), y comprobar el escalado
+de Windows al 150 %: títulos largos, tableros, controles y botones deben seguir
+siendo legibles y accesibles por teclado. Guardar el tema y reiniciar para verificar
+que se conserva. Esta comprobación visual requiere ejecutar la app WinUI.
+
 ## CI
 No existía CI en esta copia. No se añade infraestructura de despliegue.
 Un futuro job Windows con SDK 9 y herramientas WinUI debe invocar `verify.ps1`,

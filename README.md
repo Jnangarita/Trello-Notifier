@@ -17,7 +17,7 @@ La interfaz y la distribución del proyecto parten de la plantilla WinUI 3 de `c
 - Opción para incluir tarjetas vencidas pendientes, con repeticiones cada 2 horas.
 - Nuevo aviso si se cambia la fecha de vencimiento de una tarjeta.
 - Acceso directo a la tarjeta desde su aviso individual o el botón de la interfaz; los resúmenes abren Trello.
-- Temas de Windows, claro y oscuro.
+- Temas de Windows, claro y oscuro, con superficies y textos adaptados, controles redondeados y colores de alto contraste del sistema. El tema se previsualiza al seleccionarlo y se conserva al guardar la configuración.
 - Sonido de las notificaciones configurable.
 - Notificación local de prueba sin conectarse a Trello.
 - URL de API configurable para usar Postman Mock Server u otro servidor simulado.
