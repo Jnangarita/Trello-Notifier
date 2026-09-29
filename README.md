@@ -184,10 +184,22 @@ La búsqueda se combina con ambos filtros y utiliza las tarjetas ya descargadas.
 Al borrar el texto se mantienen los filtros por tablero y estado. El texto se
 conserva durante las actualizaciones de esa pantalla y se vacía al volver a abrirla.
 
-Cada tarjeta muestra su tablero debajo del título. Si no se recibe el nombre,
+La vista amplia presenta una tabla con tarjeta, tablero, vencimiento, estado y
+el botón **Abrir en Trello**. En ventanas pequeñas las filas se reorganizan y
+el tablero aparece debajo del título. Si no se recibe el nombre,
 se muestra su identificador; si tampoco está disponible, **Tablero no disponible**.
 
-La pantalla indica cuántas tarjetas coinciden con la búsqueda y ambos filtros y el total consultado. Se ordenan por vencimiento y después por nombre, con las tarjetas sin fecha al final.
+Los cuatro indicadores resumen todas las tarjetas de la última consulta, sin
+depender de los filtros: **Abiertas**, **Próximas a vencer**, **Vencidas** y
+**Al día**. Este último agrupa futuras, sin fecha y vencimientos completados.
+La anticipación es la configurada para los avisos. Rojo y ámbar identifican
+vencidas y próximas; cada fila también incluye un icono y una etiqueta de estado.
+Un error muestra un aviso y guiones en los indicadores, en lugar de ceros que
+puedan confundirse con una consulta correcta sin tarjetas.
+
+La tabla indica cuántas tarjetas coinciden con la búsqueda y ambos filtros y el
+total consultado. Las tarjetas se muestran por vencimiento y después por nombre,
+con las tarjetas sin fecha al final.
 Cambiar los filtros utiliza la última consulta y recalcula el estado según la hora actual, sin hacer solicitudes de red ni enviar avisos. Los filtros se mantienen durante las comprobaciones de esa pantalla; si el tablero seleccionado deja de tener tarjetas, se vuelve a **Todos los tableros**. Al volver a abrir la pantalla comienza en **Todas** y **Todos los tableros**.
 **Comprobar ahora** actualiza los datos desde Trello y ejecuta la comprobación habitual de recordatorios. También se actualizan automáticamente con el intervalo configurado.
 

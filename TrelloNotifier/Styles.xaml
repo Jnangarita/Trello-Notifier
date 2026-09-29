@@ -8,33 +8,60 @@
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#F4F6FA" />
-            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#EBEFF5" />
+            <SolidColorBrush x:Key="AppNavigationBackgroundBrush" Color="#EBEFF5" />
             <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#DCE3ED" />
             <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#192B46" />
             <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#52647C" />
             <SolidColorBrush x:Key="AppAccentTextBrush" Color="#175CD3" />
             <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="#EBF2FF" />
+            <SolidColorBrush x:Key="AppWarningTextBrush" Color="#805600" />
+            <SolidColorBrush x:Key="AppWarningSurfaceBrush" Color="#FFF0CC" />
+            <SolidColorBrush x:Key="AppDangerTextBrush" Color="#B42332" />
+            <SolidColorBrush x:Key="AppDangerSurfaceBrush" Color="#FCE5E8" />
+            <SolidColorBrush x:Key="AppSuccessTextBrush" Color="#147D4B" />
+            <SolidColorBrush x:Key="AppSuccessSurfaceBrush" Color="#DAF5E6" />
+            <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="#F0F4F9" />
+            <SolidColorBrush x:Key="AppBrandBrush" Color="#0878B5" />
+            <SolidColorBrush x:Key="AppBrandTextBrush" Color="#FFFFFF" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
-            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#10151E" />
-            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#151C27" />
-            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#1B2432" />
-            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#354358" />
+            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#111C27" />
+            <SolidColorBrush x:Key="AppNavigationBackgroundBrush" Color="#0B141E" />
+            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#152230" />
+            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#293949" />
             <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#F2F5FA" />
             <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#B7C4D8" />
-            <SolidColorBrush x:Key="AppAccentTextBrush" Color="#A6C9FF" />
-            <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="#233A5B" />
+            <SolidColorBrush x:Key="AppAccentTextBrush" Color="#94D9F5" />
+            <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="#1C4665" />
+            <SolidColorBrush x:Key="AppWarningTextBrush" Color="#F5CD75" />
+            <SolidColorBrush x:Key="AppWarningSurfaceBrush" Color="#55421D" />
+            <SolidColorBrush x:Key="AppDangerTextBrush" Color="#FF7C83" />
+            <SolidColorBrush x:Key="AppDangerSurfaceBrush" Color="#573039" />
+            <SolidColorBrush x:Key="AppSuccessTextBrush" Color="#87E4B1" />
+            <SolidColorBrush x:Key="AppSuccessSurfaceBrush" Color="#155C40" />
+            <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="#223140" />
+            <SolidColorBrush x:Key="AppBrandBrush" Color="#3EB6F5" />
+            <SolidColorBrush x:Key="AppBrandTextBrush" Color="#082032" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
-            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppNavigationBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="AppPanelBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="AppAccentTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="AppAccentSurfaceBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AppWarningTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppWarningSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppDangerTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppDangerSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppSuccessTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="AppSuccessSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="AppBrandBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AppBrandTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -42,7 +69,7 @@
     <CornerRadius x:Key="OverlayCornerRadius">12</CornerRadius>
 
     <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
-        <Setter Property="FontSize" Value="30" />
+        <Setter Property="FontSize" Value="34" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -76,16 +103,22 @@
     </Style>
     <!-- Se conservan las plantillas WinUI para foco, hover, pulsado y deshabilitado. -->
     <Style x:Key="ActionButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource AppControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppPanelBorderBrush}" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="16,9" />
         <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style x:Key="PrimaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="Background" Value="{ThemeResource AppBrandBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource AppBrandTextBrush}" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="16,9" />
         <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="{ThemeResource AppPanelBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppPanelBorderBrush}" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="12,9" />
         <Setter Property="CornerRadius" Value="8" />
@@ -96,15 +129,33 @@
         <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style x:Key="InputComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="Background" Value="{ThemeResource AppControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppPanelBorderBrush}" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="12,9,36,9" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
     <Style x:Key="CardListItemStyle" TargetType="ListViewItem">
+        <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0,0,0,12" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="72" />
+    </Style>
+    <Style x:Key="SummaryNumberStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style x:Key="SummaryIconStyle" TargetType="Border">
+        <Setter Property="Width" Value="52" />
+        <Setter Property="Height" Value="52" />
         <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style x:Key="TableHeadingStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
     </Style>
 </ResourceDictionary>

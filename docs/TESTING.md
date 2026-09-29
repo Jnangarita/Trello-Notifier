@@ -19,6 +19,8 @@ identificadores/nombres ausentes, compatibilidad JSON, orden y consultas vacías
 La búsqueda por nombre cubre coincidencias parciales, mayúsculas, espacios,
 nombres nulos y combinación con ambos filtros. La presentación del tablero cubre
 tarjetas completadas/sin fecha y alternativas cuando faltan nombre o identificador.
+Las insignias del dashboard cubren la anticipación personalizada, su límite exacto,
+el paso a vencida y los textos de todos los estados, sin dependencias WinUI.
 
 `Fixture` crea una carpeta temporal única y la elimina con `Dispose`.
 `MonitorDoubles.cs` aporta los mismos nombres/tipos que los servicios externos
@@ -94,15 +96,21 @@ cambie de nombre; si ya no tiene tarjetas, volver a Todos los tableros. Un fallo
 temporal no debe borrar la selección. Cambiar de tablero no debe consultar HTTP.
 Escribir y borrar la búsqueda combinada con ambos filtros; comprobar recuentos,
 estado vacío y conservación del texto al refrescar. Verificar el nombre del
-tablero debajo de cada título, también con nombres largos y datos ausentes.
+tablero en su columna (debajo del título en la vista compacta), también con nombres
+largos y datos ausentes. Comprobar los cuatro indicadores: no cambian al filtrar y
+Al día incluye futuras, sin fecha y completadas. Un fallo debe mostrar un aviso y
+guiones en los indicadores. Comprobar el orden por vencimiento y después por
+nombre, con las tarjetas sin fecha al final, también al filtrar y refrescar.
+Verificar colores e iconos de estado al filtrar y desplazar la lista (filas recicladas).
 El pipeline no demuestra que Windows haya mostrado un toast correctamente.
 
 Si cambian los estilos, alternar **Claro**, **Oscuro** y **Usar configuración de
 Windows** desde Apariencia y volver al dashboard. Comprobar fondos, texto secundario,
 insignias, desplegables, InfoBar y estados de foco, hover y deshabilitado. Revisar
-también un tema de contraste de Windows. Redimensionar a ambos lados de 800 px
-(acciones/filtros compactos) y 1100 px (panel de navegación), y comprobar el escalado
-de Windows al 150 %: títulos largos, tableros, controles y botones deben seguir
+también un tema de contraste de Windows. Redimensionar a ambos lados de 1000 px
+(cabecera e indicadores compactos) y 1100 px (panel de navegación), y comprobar el escalado
+de Windows al 150 % y el cambio tabla/filas compactas a 1250 px: títulos largos,
+tableros, controles y botones deben seguir
 siendo legibles y accesibles por teclado. Guardar el tema y reiniciar para verificar
 que se conserva. Esta comprobación visual requiere ejecutar la app WinUI.
 

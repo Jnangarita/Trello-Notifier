@@ -5,7 +5,7 @@
     Foreground="{ThemeResource AppTextPrimaryBrush}"
     Loaded="Page_Loaded"
     Unloaded="Page_Unloaded">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16" MaxWidth="1120">
+    <Grid>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup>
                 <VisualState x:Name="CompactLayout">
@@ -13,63 +13,146 @@
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="RefreshButton.(Grid.Row)" Value="1" />
-                        <Setter Target="RefreshButton.(Grid.Column)" Value="0" />
-                        <Setter Target="RefreshButton.Margin" Value="0,12,0,0" />
-                        <Setter Target="CardSearch.(Grid.ColumnSpan)" Value="2" />
-                        <Setter Target="FilterOptions.(Grid.Row)" Value="1" />
-                        <Setter Target="FilterOptions.(Grid.Column)" Value="0" />
-                        <Setter Target="FilterOptions.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="DashboardLayout.MinHeight" Value="900" />
+                        <Setter Target="HeaderActions.(Grid.Row)" Value="1" />
+                        <Setter Target="HeaderActions.(Grid.Column)" Value="0" />
+                        <Setter Target="HeaderActions.HorizontalAlignment" Value="Left" />
+                        <Setter Target="HeaderActions.Margin" Value="0,12,0,0" />
+                        <Setter Target="RefreshButton.HorizontalAlignment" Value="Left" />
+                        <Setter Target="OpenSummary.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="DueSoonSummary.(Grid.Column)" Value="2" />
+                        <Setter Target="DueSoonSummary.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="OverdueSummary.(Grid.Row)" Value="1" />
+                        <Setter Target="OverdueSummary.(Grid.Column)" Value="0" />
+                        <Setter Target="OverdueSummary.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="OverdueSummary.Margin" Value="0,12,0,0" />
+                        <Setter Target="HealthySummary.(Grid.Row)" Value="1" />
+                        <Setter Target="HealthySummary.(Grid.Column)" Value="2" />
+                        <Setter Target="HealthySummary.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="HealthySummary.Margin" Value="0,12,0,0" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="WideLayout">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="800" />
+                        <AdaptiveTrigger MinWindowWidth="1000" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+            </VisualStateGroup>
+            <VisualStateGroup>
+                <VisualState x:Name="CompactFilters">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SearchField.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="FilterOptions.(Grid.Row)" Value="1" />
+                        <Setter Target="FilterOptions.(Grid.Column)" Value="0" />
+                        <Setter Target="FilterOptions.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="FilterOptions.Margin" Value="0,12,0,0" />
+                        <Setter Target="TableHeadings.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="WideFilters">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1250" />
                     </VisualState.StateTriggers>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
 
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-            <StackPanel Spacing="6">
-                <TextBlock Text="Mis tarjetas" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Tarjetas abiertas asignadas a tu cuenta de Trello." Style="{StaticResource SecondaryTextStyle}" />
-            </StackPanel>
-            <Button x:Name="RefreshButton" Grid.Column="1" Margin="16,0,0,0"
-                    Style="{StaticResource PrimaryActionButtonStyle}" Click="Refresh_Click"
-                    HorizontalAlignment="Left" VerticalAlignment="Center"
-                    AutomationProperties.Name="Comprobar ahora">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                    <TextBlock Text="Comprobar ahora" />
+        <ScrollViewer x:Name="DashboardScroll" HorizontalScrollBarVisibility="Disabled">
+            <Grid x:Name="DashboardLayout" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="18" MinHeight="520"
+                  Height="{Binding ViewportHeight, ElementName=DashboardScroll}">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Mis tarjetas" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock Text="Tarjetas abiertas asignadas a tu cuenta de Trello." Style="{StaticResource SecondaryTextStyle}" FontSize="16" />
                 </StackPanel>
-            </Button>
-        </Grid>
-
-        <Border Grid.Row="1" Style="{StaticResource PanelStyle}" Padding="16">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
-                <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40"
-                        Padding="0" CornerRadius="10" VerticalAlignment="Center">
-                    <FontIcon x:Name="StatusIcon" Glyph="&#xE895;" FontSize="20"
-                              Foreground="{ThemeResource AppAccentTextBrush}" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
-                    <TextBlock x:Name="StatusText" Text="Iniciando monitor..." FontWeight="SemiBold" TextWrapping="Wrap" />
+                <StackPanel x:Name="HeaderActions" Grid.Column="1" Spacing="8" Margin="16,0,0,0" HorizontalAlignment="Right">
+                    <Button x:Name="RefreshButton" Style="{StaticResource PrimaryActionButtonStyle}"
+                            Click="Refresh_Click" HorizontalAlignment="Right" AutomationProperties.Name="Comprobar ahora">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE72C;" FontSize="18" />
+                            <TextBlock Text="Comprobar ahora" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
                     <TextBlock x:Name="LastCheckText" Text="Sin comprobaciones todavía" Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
+                <InfoBar x:Name="MonitorInfoBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"
+                         IsOpen="False" IsClosable="False" Visibility="Collapsed" />
             </Grid>
-        </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource PanelStyle}" Padding="16">
-            <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="1.2*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                    <TextBox x:Name="CardSearch" Header="Buscar tarjeta" PlaceholderText="Nombre de la tarjeta…"
-                             Style="{StaticResource InputTextBoxStyle}"
-                             AutomationProperties.Name="Buscar por nombre de tarjeta"
-                             TextChanged="CardSearch_TextChanged" />
-                    <Grid x:Name="FilterOptions" Grid.Column="1" ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <ComboBox x:Name="StatusFilter" Header="Estado" SelectedIndex="0"
-                                  Style="{StaticResource InputComboBoxStyle}"
+            <Grid Grid.Row="1" RowDefinitions="Auto,Auto" ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="OpenSummary" Style="{StaticResource PanelStyle}" Padding="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <Border Style="{StaticResource SummaryIconStyle}" Background="{ThemeResource AppAccentSurfaceBrush}">
+                            <FontIcon Glyph="&#xE8A5;" FontSize="25" Foreground="{ThemeResource AppAccentTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock x:Name="OpenCountText" Text="—" Style="{StaticResource SummaryNumberStyle}" Foreground="{ThemeResource AppAccentTextBrush}" />
+                            <TextBlock Text="Abiertas" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentTextBrush}" />
+                            <TextBlock Text="Tarjetas asignadas" Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border x:Name="DueSoonSummary" Grid.Column="1" Style="{StaticResource PanelStyle}" Padding="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <Border Style="{StaticResource SummaryIconStyle}" Background="{ThemeResource AppWarningSurfaceBrush}">
+                            <FontIcon Glyph="&#xE823;" FontSize="25" Foreground="{ThemeResource AppWarningTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock x:Name="DueSoonCountText" Text="—" Style="{StaticResource SummaryNumberStyle}" Foreground="{ThemeResource AppWarningTextBrush}" />
+                            <TextBlock Text="Próximas a vencer" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{ThemeResource AppWarningTextBrush}" />
+                            <TextBlock x:Name="DueSoonHelpText" Text="Según tu anticipación" Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border x:Name="OverdueSummary" Grid.Column="2" Style="{StaticResource PanelStyle}" Padding="18">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <Border Style="{StaticResource SummaryIconStyle}" Background="{ThemeResource AppDangerSurfaceBrush}">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="25" Foreground="{ThemeResource AppDangerTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock x:Name="OverdueCountText" Text="—" Style="{StaticResource SummaryNumberStyle}" Foreground="{ThemeResource AppDangerTextBrush}" />
+                            <TextBlock Text="Vencidas" FontWeight="SemiBold" Foreground="{ThemeResource AppDangerTextBrush}" />
+                            <TextBlock Text="Requieren atención" Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border x:Name="HealthySummary" Grid.Column="3" Style="{StaticResource PanelStyle}" Padding="18"
+                        ToolTipService.ToolTip="Tarjetas futuras, sin fecha o con el vencimiento completado.">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <Border Style="{StaticResource SummaryIconStyle}" Background="{ThemeResource AppSuccessSurfaceBrush}">
+                            <FontIcon Glyph="&#xE73E;" FontSize="25" Foreground="{ThemeResource AppSuccessTextBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock x:Name="HealthyCountText" Text="—" Style="{StaticResource SummaryNumberStyle}" Foreground="{ThemeResource AppSuccessTextBrush}" />
+                            <TextBlock Text="Al día" FontWeight="SemiBold" Foreground="{ThemeResource AppSuccessTextBrush}" />
+                            <TextBlock Text="Sin vencimiento próximo" Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" Style="{StaticResource PanelStyle}" Padding="14,12">
+                <Grid ColumnDefinitions="1.1*,1.4*" RowDefinitions="Auto,Auto" ColumnSpacing="24">
+                    <Grid x:Name="SearchField">
+                        <TextBox x:Name="CardSearch" PlaceholderText="Buscar tarjeta..." Padding="44,9,12,9"
+                                 Style="{StaticResource InputTextBoxStyle}" AutomationProperties.Name="Buscar por nombre de tarjeta"
+                                 TextChanged="CardSearch_TextChanged" />
+                        <FontIcon Glyph="&#xE721;" FontSize="17" HorizontalAlignment="Left" Margin="16,0,0,0"
+                                  Foreground="{ThemeResource AppTextSecondaryBrush}" IsHitTestVisible="False" />
+                    </Grid>
+                    <Grid x:Name="FilterOptions" Grid.Column="1" ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="12">
+                        <TextBlock Text="Estado" VerticalAlignment="Center" />
+                        <ComboBox x:Name="StatusFilter" Grid.Column="1" SelectedIndex="0" MinWidth="110"
+                                  Style="{StaticResource InputComboBoxStyle}" AutomationProperties.Name="Estado"
                                   SelectionChanged="StatusFilter_SelectionChanged">
                             <ComboBoxItem Content="Todas" Tag="All" />
                             <ComboBoxItem Content="Vencidas" Tag="Overdue" />
@@ -78,82 +161,157 @@
                             <ComboBoxItem Content="Sin fecha" Tag="NoDueDate" />
                             <ComboBoxItem Content="Completadas" Tag="Completed" />
                         </ComboBox>
-                        <ComboBox x:Name="BoardFilter" Grid.Column="1" Header="Tablero"
-                                  Style="{StaticResource InputComboBoxStyle}"
-                                  DisplayMemberPath="Name" SelectedValuePath="Id"
-                                  SelectionChanged="BoardFilter_SelectionChanged" />
+                        <TextBlock Grid.Column="2" Text="Tablero" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        <ComboBox x:Name="BoardFilter" Grid.Column="3" MinWidth="140"
+                                  Style="{StaticResource InputComboBoxStyle}" AutomationProperties.Name="Tablero"
+                                  DisplayMemberPath="Name" SelectedValuePath="Id" SelectionChanged="BoardFilter_SelectionChanged" />
                     </Grid>
                 </Grid>
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                    <Border Style="{StaticResource AccentBadgeStyle}" VerticalAlignment="Top">
-                        <TextBlock x:Name="CardCountText" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{ThemeResource AppAccentTextBrush}" />
-                    </Border>
-                    <TextBlock x:Name="FilterHelpText" Grid.Column="1" VerticalAlignment="Center"
-                               Text="Próximas a vencer: según la anticipación configurada para los avisos."
-                               Style="{StaticResource CaptionTextStyle}" />
-                </Grid>
-            </StackPanel>
-        </Border>
+            </Border>
 
-        <Grid Grid.Row="3">
-            <TextBlock
-                x:Name="EmptyMessage"
-                Text="Consultando tarjetas..."
-                Style="{StaticResource SecondaryTextStyle}"
-                TextAlignment="Center" MaxWidth="400" Margin="16"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center" />
-            <ListView x:Name="CardsList" SelectionMode="None"
-                      Background="Transparent" ItemContainerStyle="{StaticResource CardListItemStyle}">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource PanelStyle}" Padding="18">
-                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup>
-                                        <VisualState x:Name="CompactCard">
-                                            <VisualState.StateTriggers>
-                                                <AdaptiveTrigger MinWindowWidth="0" />
-                                            </VisualState.StateTriggers>
-                                            <VisualState.Setters>
-                                                <Setter Target="CardDetails.(Grid.ColumnSpan)" Value="2" />
-                                                <Setter Target="OpenCardButton.(Grid.Row)" Value="1" />
-                                                <Setter Target="OpenCardButton.(Grid.Column)" Value="0" />
-                                                <Setter Target="OpenCardButton.Margin" Value="0,12,0,0" />
-                                            </VisualState.Setters>
-                                        </VisualState>
-                                        <VisualState x:Name="WideCard">
-                                            <VisualState.StateTriggers>
-                                                <AdaptiveTrigger MinWindowWidth="800" />
-                                            </VisualState.StateTriggers>
-                                        </VisualState>
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-                                <StackPanel x:Name="CardDetails" Spacing="8">
-                                    <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold"
-                                               Foreground="{ThemeResource AppTextPrimaryBrush}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding BoardText}" Style="{StaticResource CaptionTextStyle}" />
-                                    <Border Style="{StaticResource AccentBadgeStyle}">
-                                        <TextBlock Text="{Binding RemainingText}" FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="{ThemeResource AppAccentTextBrush}" TextWrapping="Wrap" />
-                                    </Border>
-                                    <TextBlock Text="{Binding DueText}" Style="{StaticResource CaptionTextStyle}" />
-                                </StackPanel>
-                                <Button x:Name="OpenCardButton" Grid.Column="1" Tag="{Binding Url}"
-                                        Style="{StaticResource ActionButtonStyle}" Click="OpenCard_Click"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center"
-                                        AutomationProperties.Name="Abrir en Trello">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Abrir en Trello" />
-                                        <FontIcon Glyph="&#xE8A7;" FontSize="12" />
-                                    </StackPanel>
-                                </Button>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </Grid>
+            <Border Grid.Row="3" Style="{StaticResource PanelStyle}" Padding="0">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock x:Name="CardCountText" Text="Mis tarjetas" Margin="20,16"
+                               Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    <Border x:Name="TableHeadings" Grid.Row="1" Background="{ThemeResource AppControlBackgroundBrush}"
+                            BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1" Padding="20,9">
+                        <Grid ColumnDefinitions="2.2*,1.35*,1.45*,120,150" ColumnSpacing="16">
+                            <TextBlock Text="TARJETA" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="1" Text="TABLERO" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="2" Text="VENCIMIENTO" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="3" Text="ESTADO" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="4" Text="ACCIÓN" Style="{StaticResource TableHeadingStyle}" />
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <TextBlock x:Name="EmptyMessage" Text="Consultando tarjetas..." Style="{StaticResource SecondaryTextStyle}"
+                                   TextAlignment="Center" MaxWidth="400" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ListView x:Name="CardsList" SelectionMode="None" Background="Transparent"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ItemContainerStyle="{StaticResource CardListItemStyle}">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <UserControl Loaded="CardRow_Loaded" DataContextChanged="CardRow_DataContextChanged"
+                                                 HorizontalContentAlignment="Stretch" IsTabStop="False">
+                                        <Grid>
+                                            <VisualStateManager.VisualStateGroups>
+                                                <VisualStateGroup>
+                                                    <VisualState x:Name="Upcoming" />
+                                                    <VisualState x:Name="NoDueDate">
+                                                        <VisualState.Setters>
+                                                            <Setter Target="StateIcon.Glyph" Value="&#xE91F;" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Completed">
+                                                        <VisualState.Setters>
+                                                            <Setter Target="StatusBadge.Background" Value="{ThemeResource AppSuccessSurfaceBrush}" />
+                                                            <Setter Target="StatusContent.Foreground" Value="{ThemeResource AppSuccessTextBrush}" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Overdue">
+                                                        <VisualState.Setters>
+                                                            <Setter Target="StatusBadge.Background" Value="{ThemeResource AppDangerSurfaceBrush}" />
+                                                            <Setter Target="StatusContent.Foreground" Value="{ThemeResource AppDangerTextBrush}" />
+                                                            <Setter Target="DocumentBadge.Background" Value="{ThemeResource AppDangerSurfaceBrush}" />
+                                                            <Setter Target="DocumentIcon.Foreground" Value="{ThemeResource AppDangerTextBrush}" />
+                                                            <Setter Target="DueContent.Foreground" Value="{ThemeResource AppDangerTextBrush}" />
+                                                            <Setter Target="StateIcon.Glyph" Value="&#xE7BA;" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="DueSoon">
+                                                        <VisualState.Setters>
+                                                            <Setter Target="StatusBadge.Background" Value="{ThemeResource AppWarningSurfaceBrush}" />
+                                                            <Setter Target="StatusContent.Foreground" Value="{ThemeResource AppWarningTextBrush}" />
+                                                            <Setter Target="DocumentBadge.Background" Value="{ThemeResource AppWarningSurfaceBrush}" />
+                                                            <Setter Target="DocumentIcon.Foreground" Value="{ThemeResource AppWarningTextBrush}" />
+                                                            <Setter Target="DueContent.Foreground" Value="{ThemeResource AppWarningTextBrush}" />
+                                                            <Setter Target="StateIcon.Glyph" Value="&#xE823;" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                                <VisualStateGroup>
+                                                    <VisualState x:Name="CompactCard">
+                                                        <VisualState.StateTriggers>
+                                                            <AdaptiveTrigger MinWindowWidth="0" />
+                                                        </VisualState.StateTriggers>
+                                                        <VisualState.Setters>
+                                                            <Setter Target="TitleCell.(Grid.ColumnSpan)" Value="5" />
+                                                            <Setter Target="TitleCell.Margin" Value="0,0,0,12" />
+                                                            <Setter Target="CompactBoard.Visibility" Value="Visible" />
+                                                            <Setter Target="BoardCell.Visibility" Value="Collapsed" />
+                                                            <Setter Target="CardStatusColumn.Width" Value="0" />
+                                                            <Setter Target="DueContent.(Grid.Row)" Value="1" />
+                                                            <Setter Target="DueContent.(Grid.Column)" Value="0" />
+                                                            <Setter Target="DueContent.(Grid.ColumnSpan)" Value="3" />
+                                                            <Setter Target="StatusBadge.(Grid.Row)" Value="2" />
+                                                            <Setter Target="StatusBadge.(Grid.Column)" Value="0" />
+                                                            <Setter Target="StatusBadge.(Grid.ColumnSpan)" Value="3" />
+                                                            <Setter Target="StatusBadge.Margin" Value="0,10,0,0" />
+                                                            <Setter Target="OpenCardButton.(Grid.Row)" Value="1" />
+                                                            <Setter Target="OpenCardButton.(Grid.RowSpan)" Value="2" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="WideCard">
+                                                        <VisualState.StateTriggers>
+                                                            <AdaptiveTrigger MinWindowWidth="1250" />
+                                                        </VisualState.StateTriggers>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateManager.VisualStateGroups>
+                                            <Border BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="20,12">
+                                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="16">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="2.2*" />
+                                                        <ColumnDefinition Width="1.35*" />
+                                                        <ColumnDefinition Width="1.45*" />
+                                                        <ColumnDefinition x:Name="CardStatusColumn" Width="120" />
+                                                        <ColumnDefinition Width="150" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid x:Name="TitleCell" ColumnDefinitions="Auto,*" ColumnSpacing="16" VerticalAlignment="Center">
+                                                        <Border x:Name="DocumentBadge" Width="42" Height="44" CornerRadius="10" Background="{ThemeResource AppControlBackgroundBrush}">
+                                                            <FontIcon x:Name="DocumentIcon" Glyph="&#xE8A5;" FontSize="21" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                            <TextBlock x:Name="CompactBoard" Text="{Binding BoardText}" Style="{StaticResource CaptionTextStyle}" Visibility="Collapsed" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock x:Name="BoardCell" Grid.Column="1" Text="{Binding BoardName}" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
+                                                    <UserControl x:Name="DueContent" Grid.Column="2" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" IsTabStop="False">
+                                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                                            <FontIcon Glyph="&#xE787;" FontSize="20" />
+                                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                                <TextBlock Text="{Binding DueText}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding RemainingText}" FontSize="12" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </UserControl>
+                                                    <Border x:Name="StatusBadge" Grid.Column="3" Style="{StaticResource AccentBadgeStyle}" Padding="10,8" VerticalAlignment="Center">
+                                                        <UserControl x:Name="StatusContent" Foreground="{ThemeResource AppAccentTextBrush}" IsTabStop="False">
+                                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                <FontIcon x:Name="StateIcon" Glyph="&#xE73E;" FontSize="16" />
+                                                                <TextBlock Text="{Binding StatusText}" FontSize="13" FontWeight="SemiBold" />
+                                                            </StackPanel>
+                                                        </UserControl>
+                                                    </Border>
+                                                    <Button x:Name="OpenCardButton" Grid.Column="4" Tag="{Binding Url}" Style="{StaticResource ActionButtonStyle}"
+                                                            Click="OpenCard_Click" HorizontalAlignment="Stretch" VerticalAlignment="Center" AutomationProperties.Name="Abrir en Trello">
+                                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                                            <TextBlock Text="Abrir en Trello" />
+                                                            <FontIcon Glyph="&#xE8A7;" FontSize="14" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </UserControl>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Grid>
+            </Border>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </Page>

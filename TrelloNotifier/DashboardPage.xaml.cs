@@ -20,10 +20,10 @@ public sealed partial class DashboardPage : Page
         BoardFilter.SelectedIndex = 0;
     }
 
-    private void Page_Loaded(object sender, RoutedEventArgs e)
+    private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         AppServices.Monitor.Updated += OnMonitorUpdated;
-        _ = AppServices.Monitor.CheckNowAsync();
+        await RefreshCardsAsync();
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
@@ -33,7 +33,20 @@ public sealed partial class DashboardPage : Page
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
-        await AppServices.Monitor.CheckNowAsync();
+        await RefreshCardsAsync();
+    }
+
+    private async Task RefreshCardsAsync()
+    {
+        RefreshButton.IsEnabled = false;
+        try
+        {
+            await AppServices.Monitor.CheckNowAsync();
+        }
+        finally
+        {
+            RefreshButton.IsEnabled = true;
+        }
     }
 
     private void OpenCard_Click(object sender, RoutedEventArgs e)
@@ -51,17 +64,18 @@ public sealed partial class DashboardPage : Page
         DispatcherQueue.TryEnqueue(() =>
         {
             _snapshot = snapshot;
-            StatusText.Text = snapshot.Message;
-            StatusIcon.Glyph = snapshot.HasError ? "\uEA39" : snapshot.IsRunning ? "\uE73E" : "\uE895";
-            LastCheckText.Text = snapshot.LastCheck is null
-                ? "Sin comprobaciones todavía"
-                : $"Última comprobación: {snapshot.LastCheck.Value.ToLocalTime():dd/MM/yyyy HH:mm:ss}";
+            MonitorInfoBar.Message = snapshot.Message;
+            MonitorInfoBar.Severity = snapshot.HasError ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
+            MonitorInfoBar.IsOpen = snapshot.HasError || !snapshot.IsRunning;
+            MonitorInfoBar.Visibility = MonitorInfoBar.IsOpen ? Visibility.Visible : Visibility.Collapsed;
 
             if (snapshot.IsRunning && !snapshot.HasError)
             {
                 UpdateBoardFilter(snapshot);
-                FilterHelpText.Text = $"Próximas a vencer: próximos {snapshot.NotifyBeforeMinutes} minutos. " +
-                    "Completadas: vencimiento marcado como completado en Trello.";
+                LastCheckText.Text = snapshot.LastCheck is null
+                    ? "Sin comprobaciones todavía"
+                    : $"Última actualización: {snapshot.LastCheck.Value.ToLocalTime():dd/MM/yyyy HH:mm}";
+                DueSoonHelpText.Text = $"En los próximos {snapshot.NotifyBeforeMinutes} minutos";
             }
 
             ApplyFilter();
@@ -81,6 +95,25 @@ public sealed partial class DashboardPage : Page
     private void CardSearch_TextChanged(object sender, TextChangedEventArgs e)
     {
         ApplyFilter();
+    }
+
+    private void CardRow_Loaded(object sender, RoutedEventArgs e)
+    {
+        ApplyCardState((Control)sender);
+    }
+
+    private void CardRow_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        // ListView recicla filas: el color debe seguir al nuevo elemento, no al anterior.
+        ApplyCardState((Control)sender);
+    }
+
+    private static void ApplyCardState(Control row)
+    {
+        if (row.DataContext is TrelloCardViewModel card)
+        {
+            VisualStateManager.GoToState(row, card.Status.ToString(), false);
+        }
     }
 
     private void UpdateBoardFilter(MonitorSnapshot snapshot)
@@ -113,10 +146,21 @@ public sealed partial class DashboardPage : Page
         _cards.Clear();
         foreach (TrelloCard card in cards)
         {
-            _cards.Add(new TrelloCardViewModel(card, now));
+            _cards.Add(new TrelloCardViewModel(card, now, _snapshot.NotifyBeforeMinutes));
         }
 
-        CardCountText.Text = $"{_cards.Count} de {_snapshot.AssignedCards.Count} tarjeta(s)";
+        bool available = _snapshot.IsRunning && !_snapshot.HasError;
+        var counts = _snapshot.AssignedCards.GroupBy(card => card.GetStatus(now, _snapshot.NotifyBeforeMinutes))
+            .ToDictionary(group => group.Key, group => group.Count());
+        int overdue = counts.GetValueOrDefault(TrelloCardStatus.Overdue);
+        int dueSoon = counts.GetValueOrDefault(TrelloCardStatus.DueSoon);
+        OpenCountText.Text = available ? _snapshot.AssignedCards.Count.ToString() : "—";
+        OverdueCountText.Text = available ? overdue.ToString() : "—";
+        DueSoonCountText.Text = available ? dueSoon.ToString() : "—";
+        HealthyCountText.Text = available ? (_snapshot.AssignedCards.Count - overdue - dueSoon).ToString() : "—";
+        CardCountText.Text = !available ? "Mis tarjetas"
+            : _cards.Count == _snapshot.AssignedCards.Count
+                ? $"{_cards.Count} {(_cards.Count == 1 ? "tarjeta" : "tarjetas")}" : $"{_cards.Count} de {_snapshot.AssignedCards.Count} tarjetas";
         EmptyMessage.Text = _snapshot.HasError
             ? "No se pudieron consultar las tarjetas. Revisa la conexión y pulsa Comprobar ahora."
             : !_snapshot.IsRunning

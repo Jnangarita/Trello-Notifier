@@ -2,16 +2,27 @@ namespace TrelloNotifier.Models;
 
 public sealed class TrelloCardViewModel
 {
-    public TrelloCardViewModel(TrelloCard card, DateTimeOffset now)
+    public TrelloCardViewModel(TrelloCard card, DateTimeOffset now, int? notifyBeforeMinutes = null)
     {
         Name = card.Name;
-        BoardText = !string.IsNullOrWhiteSpace(card.BoardName)
-            ? $"Tablero: {card.BoardName}"
+        BoardName = !string.IsNullOrWhiteSpace(card.BoardName)
+            ? card.BoardName
             : !string.IsNullOrWhiteSpace(card.BoardId)
-                ? $"Tablero: {card.BoardId}"
+                ? card.BoardId
                 : "Tablero no disponible";
+        BoardText = string.IsNullOrWhiteSpace(card.BoardName) && string.IsNullOrWhiteSpace(card.BoardId)
+            ? BoardName : $"Tablero: {BoardName}";
         Url = card.Url;
         DueText = card.Due?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Sin fecha de vencimiento";
+        Status = card.GetStatus(now, notifyBeforeMinutes ?? new AppSettings().NotifyBeforeMinutes);
+        StatusText = Status switch
+        {
+            TrelloCardStatus.Overdue => "Vencida",
+            TrelloCardStatus.DueSoon => "Próxima",
+            TrelloCardStatus.Upcoming => "Al día",
+            TrelloCardStatus.Completed => "Completada",
+            _ => "Sin fecha"
+        };
 
         if (card.DueComplete)
         {
@@ -36,8 +47,11 @@ public sealed class TrelloCardViewModel
     }
 
     public string Name { get; }
+    public string BoardName { get; }
     public string BoardText { get; }
     public string Url { get; }
     public string DueText { get; }
     public string RemainingText { get; }
+    public TrelloCardStatus Status { get; }
+    public string StatusText { get; }
 }

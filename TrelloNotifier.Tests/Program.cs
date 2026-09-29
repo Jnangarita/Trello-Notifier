@@ -83,6 +83,36 @@ await Run("Nombre del tablero visible también en tarjetas completadas y sin fec
     return Task.CompletedTask;
 });
 
+await Run("Insignias del dashboard respetan la anticipación y los estados especiales", () =>
+{
+    (TrelloCard Card, TrelloCardStatus Status, string Text)[] cases =
+    {
+        (Card("vencida", now), TrelloCardStatus.Overdue, "Vencida"),
+        (Card("limite", now.AddMinutes(90)), TrelloCardStatus.DueSoon, "Próxima"),
+        (Card("futura", now.AddMinutes(90).AddTicks(1)), TrelloCardStatus.Upcoming, "Al día"),
+        (Card("sin-fecha", null), TrelloCardStatus.NoDueDate, "Sin fecha"),
+        (Card("completada", now.AddDays(-1), true), TrelloCardStatus.Completed, "Completada")
+    };
+    foreach (var item in cases)
+    {
+        var viewModel = new TrelloCardViewModel(item.Card, now, 90);
+        Check(viewModel.Status == item.Status && viewModel.StatusText == item.Text,
+            $"La insignia de {item.Card.Id} coincide con la ventana del monitor.");
+    }
+
+    TrelloCard changing = Card("cambiante", now.AddMinutes(90));
+    Check(new TrelloCardViewModel(changing, now, 60).StatusText == "Al día", "Fuera de una ventana más corta.");
+    Check(new TrelloCardViewModel(changing, now.AddMinutes(90), 60).StatusText == "Vencida", "Actualizar el estado al vencer.");
+    changing.BoardName = "Equipo de diseño";
+    Check(new TrelloCardViewModel(changing, now).BoardName == "Equipo de diseño", "Columna de tablero sin prefijo.");
+    changing.BoardName = null;
+    changing.BoardId = "tablero-prueba";
+    Check(new TrelloCardViewModel(changing, now).BoardName == "tablero-prueba", "Usar ID cuando falta el nombre.");
+    changing.BoardId = string.Empty;
+    Check(new TrelloCardViewModel(changing, now).BoardName == "Tablero no disponible", "Datos ausentes en la tabla.");
+    return Task.CompletedTask;
+});
+
 await Run("Búsqueda parcial por nombre combinada con tablero y estado", () =>
 {
     TrelloCard first = Card("primera", now.AddMinutes(10));
