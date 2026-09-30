@@ -170,11 +170,9 @@
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource PanelStyle}" Padding="0">
-                <Grid RowDefinitions="Auto,Auto,*">
-                    <TextBlock x:Name="CardCountText" Text="Mis tarjetas" Margin="20,16"
-                               Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
-                    <Border x:Name="TableHeadings" Grid.Row="1" Background="{ThemeResource AppControlBackgroundBrush}"
-                            BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1" Padding="20,9">
+                <Grid RowDefinitions="Auto,*">
+                    <Border x:Name="TableHeadings" Background="{ThemeResource AppControlBackgroundBrush}"
+                            BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="20,9">
                         <Grid ColumnDefinitions="2.2*,1.35*,1.45*,120,150" ColumnSpacing="16">
                             <TextBlock Text="TARJETA" Style="{StaticResource TableHeadingStyle}" />
                             <TextBlock Grid.Column="1" Text="TABLERO" Style="{StaticResource TableHeadingStyle}" />
@@ -183,7 +181,7 @@
                             <TextBlock Grid.Column="4" Text="ACCIÓN" Style="{StaticResource TableHeadingStyle}" />
                         </Grid>
                     </Border>
-                    <Grid Grid.Row="2">
+                    <Grid Grid.Row="1">
                         <TextBlock x:Name="EmptyMessage" Text="Consultando tarjetas..." Style="{StaticResource SecondaryTextStyle}"
                                    TextAlignment="Center" MaxWidth="400" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <ListView x:Name="CardsList" SelectionMode="None" Background="Transparent"

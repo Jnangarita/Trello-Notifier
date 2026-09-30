@@ -158,9 +158,6 @@ public sealed partial class DashboardPage : Page
         OverdueCountText.Text = available ? overdue.ToString() : "—";
         DueSoonCountText.Text = available ? dueSoon.ToString() : "—";
         HealthyCountText.Text = available ? (_snapshot.AssignedCards.Count - overdue - dueSoon).ToString() : "—";
-        CardCountText.Text = !available ? "Mis tarjetas"
-            : _cards.Count == _snapshot.AssignedCards.Count
-                ? $"{_cards.Count} {(_cards.Count == 1 ? "tarjeta" : "tarjetas")}" : $"{_cards.Count} de {_snapshot.AssignedCards.Count} tarjetas";
         EmptyMessage.Text = _snapshot.HasError
             ? "No se pudieron consultar las tarjetas. Revisa la conexión y pulsa Comprobar ahora."
             : !_snapshot.IsRunning
