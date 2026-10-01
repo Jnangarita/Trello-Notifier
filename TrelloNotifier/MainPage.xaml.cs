@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TrelloNotifier.Models;
 
 namespace TrelloNotifier;
 
@@ -30,7 +31,7 @@ public sealed partial class MainPage : Page
     private async void Navigation_Loaded(object sender, RoutedEventArgs e)
     {
         Navigation.SelectedItem = Navigation.MenuItems[0];
-        NavigateToDashboard();
+        NavigateToCards(TrelloCardScope.Pending);
         try
         {
             var settings = await Task.Run(AppServices.Settings.Load);
@@ -51,16 +52,17 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        NavigateToDashboard();
+        NavigateToCards((args.InvokedItemContainer as NavigationViewItem)?.Tag as string == "History"
+            ? TrelloCardScope.History : TrelloCardScope.Pending);
     }
 
-    private void NavigateToDashboard()
+    private void NavigateToCards(TrelloCardScope scope)
     {
-        if (ContentFrame.CurrentSourcePageType != typeof(DashboardPage))
+        if (ContentFrame.Content is not DashboardPage page || page.Scope != scope)
         {
-            ContentFrame.Navigate(typeof(DashboardPage));
+            ContentFrame.Navigate(typeof(DashboardPage), scope);
         }
 
-        Navigation.Header = "Trello Notifier";
+        Navigation.Header = scope == TrelloCardScope.History ? "Historial" : "Trello Notifier";
     }
 }

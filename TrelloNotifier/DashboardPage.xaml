@@ -65,15 +65,15 @@
                   Height="{Binding ViewportHeight, ElementName=DashboardScroll}">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Mis tarjetas" Style="{StaticResource PageTitleStyle}" />
-                    <TextBlock Text="Tarjetas abiertas asignadas a tu cuenta de Trello." Style="{StaticResource SecondaryTextStyle}" FontSize="16" />
+                    <TextBlock x:Name="PageTitle" Text="Mis tarjetas" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock x:Name="PageDescription" Text="Tarjetas pendientes y no archivadas asignadas a tu cuenta de Trello." Style="{StaticResource SecondaryTextStyle}" FontSize="16" />
                 </StackPanel>
                 <StackPanel x:Name="HeaderActions" Grid.Column="1" Spacing="8" Margin="16,0,0,0" HorizontalAlignment="Right">
                     <Button x:Name="RefreshButton" Style="{StaticResource PrimaryActionButtonStyle}"
                             Click="Refresh_Click" HorizontalAlignment="Right" AutomationProperties.Name="Comprobar ahora">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <FontIcon Glyph="&#xE72C;" FontSize="18" />
-                            <TextBlock Text="Comprobar ahora" FontWeight="SemiBold" />
+                            <TextBlock x:Name="RefreshText" Text="Comprobar ahora" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
                     <TextBlock x:Name="LastCheckText" Text="Sin comprobaciones todavía" Style="{StaticResource CaptionTextStyle}" />
@@ -82,7 +82,7 @@
                          IsOpen="False" IsClosable="False" Visibility="Collapsed" />
             </Grid>
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,Auto" ColumnSpacing="14">
+            <Grid x:Name="SummaryPanel" Grid.Row="1" RowDefinitions="Auto,Auto" ColumnSpacing="14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -96,7 +96,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="2">
                             <TextBlock x:Name="OpenCountText" Text="—" Style="{StaticResource SummaryNumberStyle}" Foreground="{ThemeResource AppAccentTextBrush}" />
-                            <TextBlock Text="Abiertas" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentTextBrush}" />
+                            <TextBlock Text="Pendientes" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentTextBrush}" />
                             <TextBlock Text="Tarjetas asignadas" Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
                     </Grid>
@@ -126,7 +126,7 @@
                     </Grid>
                 </Border>
                 <Border x:Name="HealthySummary" Grid.Column="3" Style="{StaticResource PanelStyle}" Padding="18"
-                        ToolTipService.ToolTip="Tarjetas futuras, sin fecha o con el vencimiento completado.">
+                        ToolTipService.ToolTip="Tarjetas pendientes futuras o sin fecha, no archivadas.">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                         <Border Style="{StaticResource SummaryIconStyle}" Background="{ThemeResource AppSuccessSurfaceBrush}">
                             <FontIcon Glyph="&#xE73E;" FontSize="25" Foreground="{ThemeResource AppSuccessTextBrush}" />
@@ -154,12 +154,11 @@
                         <ComboBox x:Name="StatusFilter" Grid.Column="1" SelectedIndex="0" MinWidth="110"
                                   Style="{StaticResource InputComboBoxStyle}" AutomationProperties.Name="Estado"
                                   SelectionChanged="StatusFilter_SelectionChanged">
-                            <ComboBoxItem Content="Todas" Tag="All" />
+                            <ComboBoxItem Content="Todas las pendientes" Tag="All" />
                             <ComboBoxItem Content="Vencidas" Tag="Overdue" />
                             <ComboBoxItem Content="Próximas a vencer" Tag="DueSoon" />
                             <ComboBoxItem Content="Futuras" Tag="Upcoming" />
                             <ComboBoxItem Content="Sin fecha" Tag="NoDueDate" />
-                            <ComboBoxItem Content="Completadas" Tag="Completed" />
                         </ComboBox>
                         <TextBlock Grid.Column="2" Text="Tablero" VerticalAlignment="Center" Margin="8,0,0,0" />
                         <ComboBox x:Name="BoardFilter" Grid.Column="3" MinWidth="140"
@@ -195,6 +194,13 @@
                                             <VisualStateManager.VisualStateGroups>
                                                 <VisualStateGroup>
                                                     <VisualState x:Name="Upcoming" />
+                                                    <VisualState x:Name="Archived">
+                                                        <VisualState.Setters>
+                                                            <Setter Target="StatusBadge.Background" Value="{ThemeResource AppControlBackgroundBrush}" />
+                                                            <Setter Target="StatusContent.Foreground" Value="{ThemeResource AppTextSecondaryBrush}" />
+                                                            <Setter Target="StateIcon.Glyph" Value="&#xE7B8;" />
+                                                        </VisualState.Setters>
+                                                    </VisualState>
                                                     <VisualState x:Name="NoDueDate">
                                                         <VisualState.Setters>
                                                             <Setter Target="StateIcon.Glyph" Value="&#xE91F;" />

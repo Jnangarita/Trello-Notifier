@@ -21,12 +21,14 @@ La API base puede cambiarse para utilizar un servidor simulado sin credenciales.
 Las páginas usan code-behind, no un framework MVVM. `AppServices` construye
 instancias compartidas de servicios concretos. `App` inicia el monitor y gestiona
 activación/cierre. `MainPage` proporciona navegación, tema e InfoBar.
-`DashboardPage` filtra todas las abiertas asignadas del snapshot por estado;
+`DashboardPage` muestra pendientes no archivadas del snapshot y reutiliza su UI
+para Historial (completadas o archivadas, consulta bajo demanda sin avisos);
 `SettingsPage` valida y guarda preferencias.
 `Styles.xaml` contiene los estilos compartidos.
 
-`Models/` contiene `AppSettings`, `TrelloCard` (también DTO JSON; `GetStatus`
-clasifica vencimientos con `TrelloCardStatus`), `MonitorSnapshot` (asignadas y
+`Models/` contiene `AppSettings`, `TrelloCard` (también DTO JSON; `closed` es
+independiente de `dueComplete`; `GetStatus` clasifica vencimientos con
+`TrelloCardStatus`), `MonitorSnapshot` (ámbitos `TrelloCardScope`, asignadas y
 candidatas a avisos separadas) y `TrelloCardViewModel` (textos, sin WinUI).
 `DueCardMonitor` coordina consulta, historial y avisos; protege comprobaciones
 con `SemaphoreSlim`. `ReminderSchedule` decide elegibilidad, repetición y clave

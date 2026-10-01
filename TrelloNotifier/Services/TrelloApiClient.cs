@@ -10,12 +10,19 @@ internal sealed class TrelloApiClient
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    public async Task<IReadOnlyList<TrelloCard>> GetOpenCardsAsync(
+    public Task<IReadOnlyList<TrelloCard>> GetOpenCardsAsync(
         AppSettings settings,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => GetCardsAsync(settings, "open", cancellationToken);
+
+    public Task<IReadOnlyList<TrelloCard>> GetAllCardsAsync(
+        AppSettings settings,
+        CancellationToken cancellationToken) => GetCardsAsync(settings, "all", cancellationToken);
+
+    private async Task<IReadOnlyList<TrelloCard>> GetCardsAsync(
+        AppSettings settings, string filter, CancellationToken cancellationToken)
     {
         List<TrelloCard> cards = await GetListAsync<TrelloCard>(settings,
-            "cards?filter=open&fields=id,name,idBoard,due,dueComplete,url", cancellationToken);
+            $"cards?filter={filter}&fields=id,name,idBoard,due,dueComplete,closed,url", cancellationToken);
         if (cards.Any(card => !string.IsNullOrWhiteSpace(card.BoardId)))
         {
             List<TrelloBoard> boards = await GetListAsync<TrelloBoard>(settings,

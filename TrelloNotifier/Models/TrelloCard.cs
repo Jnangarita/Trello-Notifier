@@ -22,6 +22,9 @@ public sealed class TrelloCard
     [JsonPropertyName("dueComplete")]
     public bool DueComplete { get; set; }
 
+    [JsonPropertyName("closed")]
+    public bool Closed { get; set; }
+
     [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 

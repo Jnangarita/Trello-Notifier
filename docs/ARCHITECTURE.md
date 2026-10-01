@@ -9,6 +9,7 @@ Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework
 App → MainWindow / MainPage → DashboardPage / SettingsPage
 App / páginas → AppServices (composición de instancias concretas)
 DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
+DashboardPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
 SettingsPage → SettingsStore, TrelloApiClient, notificaciones, monitor
 DueCardMonitor → ReminderSchedule, SettingsStore, DesktopNotificationService
 Services → Models
@@ -26,10 +27,16 @@ avisos y persiste las horas solo si se emitieron. Publica `MonitorSnapshot` con
 y la anticipación usada. `TrelloCard.GetStatus` centraliza los estados temporales
 para el calendario y los filtros; no depende de la preferencia de avisar vencidas.
 `MonitorSnapshot` obtiene las opciones de tablero y filtra sus tarjetas por
-tablero y estado, reutilizando `GetStatus`. El dashboard aplica esos filtros
-localmente, actualiza controles mediante
-`DispatcherQueue` y transforma tarjetas con `TrelloCardViewModel`, incluidas
-completadas y sin fecha. La UI contiene coordinación en code-behind.
+ámbito (`TrelloCardScope`), tablero, estado y búsqueda, reutilizando `GetStatus`.
+Mis tarjetas usa el ámbito pendiente (sin completar ni archivar), también para
+sus indicadores. `DashboardPage` se reutiliza mediante un parámetro de navegación
+para Historial: consulta todas las asignadas al entrar o actualizar, muestra la
+unión de completadas y archivadas y permite filtrar ambos estados independientes.
+Esa vista no se suscribe al monitor ni dispara recordatorios; cancela su consulta
+al salir y no persiste tarjetas. Ambas vistas reutilizan filas, estilos y
+`TrelloCardViewModel`; las archivadas muestran su condición de completado sin
+urgencia temporal. El monitor actualiza controles mediante `DispatcherQueue`.
+La UI contiene coordinación en code-behind.
 
 ## Responsabilidades y dependencias
 | Área | Permitido actualmente | No introducir |

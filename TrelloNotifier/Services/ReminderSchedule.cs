@@ -11,8 +11,8 @@ internal static class ReminderSchedule
             .Where(card =>
             {
                 TrelloCardStatus status = card.GetStatus(now, settings.NotifyBeforeMinutes);
-                return status == TrelloCardStatus.DueSoon ||
-                    (status == TrelloCardStatus.Overdue && settings.IncludeOverdueCards);
+                return !card.Closed && (status == TrelloCardStatus.DueSoon ||
+                    (status == TrelloCardStatus.Overdue && settings.IncludeOverdueCards));
             })
             .OrderBy(card => card.Due)
             .ToList();

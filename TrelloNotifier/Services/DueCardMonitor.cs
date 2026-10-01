@@ -125,7 +125,7 @@ internal sealed class DueCardMonitor : IDisposable
 
             Dictionary<string, DateTimeOffset> notifiedCards = _settingsStore.LoadNotifiedCards();
             HashSet<string> currentCardKeys = cards
-                .Where(card => card.Due is not null && !card.DueComplete)
+                .Where(card => card.Due is not null && !card.DueComplete && !card.Closed)
                 .Select(ReminderSchedule.GetKey)
                 .ToHashSet(StringComparer.Ordinal);
             List<string> obsoleteKeys = notifiedCards.Keys.Where(key => !currentCardKeys.Contains(key)).ToList();

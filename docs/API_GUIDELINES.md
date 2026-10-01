@@ -6,14 +6,14 @@ cliente de tarjetas; reutilizarlo en UI y monitor.
 | Aspecto | Implementación actual |
 | --- | --- |
 | Endpoint | `GET {ApiBaseUrl}/1/members/me/cards` |
-| Query | `filter=open&fields=id,name,idBoard,due,dueComplete,url` |
+| Query | `filter=open&fields=id,name,idBoard,due,dueComplete,closed,url` para monitor/conexión; `filter=all` con los mismos campos para Historial |
 | Nombres de tableros | `GET {ApiBaseUrl}/1/members/me/boards?filter=all&fields=name`, una vez por consulta si hay tarjetas con `idBoard` |
 | Autenticación | `key` y `token` opcionales en query, escapados con `Uri.EscapeDataString` |
 | Requisito de credenciales | UI/modelo las requieren para `api.trello.com`; mocks pueden omitirlas |
 | HTTP | Una instancia `HttpClient` por `TrelloApiClient`, timeout 30 s |
 | Cancelación | `CancellationToken` en solicitud y lectura JSON |
 | Serialización | `ReadFromJsonAsync<List<T>>`, `System.Text.Json`; tarjetas y tableros comparten autenticación y manejo HTTP |
-| DTO | `Models/TrelloCard.cs` (`id`, `name`, `idBoard`, `due`, `dueComplete`, `url`) y `Models/TrelloBoard.cs` (`id`, `name`) |
+| DTO | `Models/TrelloCard.cs` (`id`, `name`, `idBoard`, `due`, `dueComplete`, `closed`, `url`) y `Models/TrelloBoard.cs` (`id`, `name`) |
 | Fechas | `DateTimeOffset? Due`; presentación convierte a hora local |
 | Respuesta vacía JSON | Un resultado deserializado `null` se convierte a lista vacía; JSON inválido lanza excepción |
 | Status HTTP | No-2xx produce `HttpRequestException` con código/motivo; no hay tratamiento específico 401/403/429 |
@@ -24,6 +24,14 @@ La UI de prueba de conexión muestra errores en InfoBar; el monitor los publica
 en `MonitorSnapshot.HasError`. Un fallo de API no debe consumir el historial
 de notificaciones. No agregar un segundo cliente ni retries que multipliquen
 solicitudes sin evaluar el intervalo del monitor y los límites del proveedor.
+
+`GetAllCardsAsync` reutiliza el mismo flujo HTTP y enriquecimiento de tableros que
+`GetOpenCardsAsync`. Solo el historial lo invoca al entrar o actualizar; se cancela
+al salir de la página. La selección local conserva completadas o archivadas
+asignadas a la cuenta, sin consultar acciones ni persistir una copia histórica.
+`closed` y `dueComplete` son independientes; si falta `closed`, su valor es `false`
+para conservar compatibilidad con mocks anteriores. Las archivadas no son
+candidatas a recordatorios incluso si un servidor simulado las devuelve con `filter=open`.
 
 `TrelloCard` sirve como DTO y modelo interno; no hay mapper de transporte.
 `TrelloCardViewModel` transforma a textos visibles. Nuevos campos deben seguir

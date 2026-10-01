@@ -21,6 +21,10 @@ nombres nulos y combinación con ambos filtros. La presentación del tablero cub
 tarjetas completadas/sin fecha y alternativas cuando faltan nombre o identificador.
 Las insignias del dashboard cubren la anticipación personalizada, su límite exacto,
 el paso a vencida y los textos de todos los estados, sin dependencias WinUI.
+Los ámbitos pendiente/historial cubren completadas y archivadas independientes,
+su unión sin duplicados, filtros combinados, tableros, listas vacías, restauración
+y compatibilidad de `closed` ausente. Se comprueba que las archivadas no generan
+avisos y se retiran del historial de repetición aunque un mock las devuelva como abiertas.
 
 `Fixture` crea una carpeta temporal única y la elimina con `Dispose`.
 `MonitorDoubles.cs` aporta los mismos nombres/tipos que los servicios externos
@@ -86,8 +90,9 @@ Abrir en Windows, navegar dashboard/configuración, guardar y comprobar temas,
 usar **Probar notificación** sin red. Para integración HTTP usar un mock con
 valores ficticios siguiendo el README; comprobar refresco y errores. Revisar
 suscripciones, activación de enlaces y duplicación de recordatorios si se tocaron.
-En **Mis tarjetas**, comprobar los seis filtros, recuentos, estado vacío y error;
-incluir tarjetas sin fecha y completadas. Desactivar avisos de vencidas debe
+En **Mis tarjetas**, comprobar los cinco filtros, recuentos, estado vacío y error;
+incluir tarjetas sin fecha y verificar que completadas y archivadas quedan fuera.
+Desactivar avisos de vencidas debe
 mantenerlas visibles. Cambiar filtro no debe consultar HTTP; una comprobación
 debe conservar el filtro seleccionado y reflejar cambios de fecha/estado.
 Combinar el selector de tablero con cada estado; comprobar Todos los tableros,
@@ -98,11 +103,21 @@ Escribir y borrar la búsqueda combinada con ambos filtros; comprobar recuentos,
 estado vacío y conservación del texto al refrescar. Verificar el nombre del
 tablero en su columna (debajo del título en la vista compacta), también con nombres
 largos y datos ausentes. Comprobar los cuatro indicadores: no cambian al filtrar y
-Al día incluye futuras, sin fecha y completadas. Un fallo debe mostrar un aviso y
+Al día incluye solo futuras y sin fecha pendientes no archivadas. Un fallo debe mostrar un aviso y
 guiones en los indicadores. Comprobar el orden por vencimiento y después por
 nombre, con las tarjetas sin fecha al final, también al filtrar y refrescar.
 Verificar colores e iconos de estado al filtrar y desplazar la lista (filas recicladas).
 El pipeline no demuestra que Windows haya mostrado un toast correctamente.
+
+En **Historial**, comprobar Todas, Completadas y Archivadas con tarjetas que tengan
+ambos estados y archivadas sin completar; estas últimas no deben parecer completadas
+ni urgentes. Combinar búsqueda/tablero y comprobar vacíos. Con un mock, verificar
+`filter=all` solo al entrar o actualizar; filtros locales y ciclos del monitor no
+deben refrescar el historial ni emitir avisos desde esa vista. Navegar entre las
+dos vistas mientras carga debe cancelar la consulta saliente y evitar resultados
+tardíos. Probar error HTTP, JSON inválido, timeout, configuración ausente y recuperación;
+conservar filtros tras error y actualizar tableros por ID tras una consulta correcta.
+Comprobar temas, diseño compacto y apertura de enlaces también en Historial.
 
 Si cambian los estilos, alternar **Claro**, **Oscuro** y **Usar configuración de
 Windows** desde Apariencia y volver al dashboard. Comprobar fondos, texto secundario,

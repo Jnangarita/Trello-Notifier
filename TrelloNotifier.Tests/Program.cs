@@ -242,6 +242,76 @@ await Run("Campos de tablero compatibles con respuestas anteriores y valores nul
     return Task.CompletedTask;
 });
 
+await Run("Mis tarjetas separa pendientes del historial y sus tableros", () =>
+{
+    TrelloCard overdue = Card("vencida", now);
+    overdue.BoardId = "activo";
+    TrelloCard soon = Card("proxima", now.AddMinutes(30));
+    TrelloCard future = Card("futura", now.AddDays(1));
+    TrelloCard noDueDate = Card("sin-fecha", null);
+    TrelloCard completed = Card("completada", null, true);
+    completed.BoardId = "terminado";
+    TrelloCard archived = Card("archivada", now.AddMinutes(-1));
+    archived.Closed = true;
+    archived.BoardId = "archivo";
+    TrelloCard both = Card("completada-archivada", now.AddMinutes(10), true);
+    both.Closed = true;
+    both.BoardId = "archivo";
+    var snapshot = new MonitorSnapshot(true, "", now, Array.Empty<TrelloCard>())
+    {
+        AssignedCards = new[] { overdue, soon, future, noDueDate, completed, archived, both },
+        NotifyBeforeMinutes = 60
+    };
+
+    Check(snapshot.GetCards(TrelloCardScope.Pending).Select(card => card.Id)
+        .SequenceEqual(new[] { "vencida", "proxima", "futura", "sin-fecha" }), "Pendientes excluye completadas y archivadas.");
+    Check(snapshot.GetCards(TrelloCardScope.History).Count() == 3, "Historial incluye la unión, sin duplicar una completada archivada.");
+    Check(snapshot.GetCards(TrelloCardScope.Completed).SequenceEqual(new[] { completed, both }), "Completadas incluye las archivadas.");
+    Check(snapshot.GetCards(TrelloCardScope.Archived).SequenceEqual(new[] { archived, both }), "Archivar no exige completar.");
+    Check(snapshot.GetBoards(TrelloCardScope.Pending).Single().Id == "activo", "Tableros del dashboard solo con pendientes.");
+    Check(snapshot.GetBoards(TrelloCardScope.History).Select(board => board.Id).OrderBy(id => id)
+        .SequenceEqual(new[] { "archivo", "terminado" }), "Tableros del historial solo con completadas o archivadas.");
+    Check(snapshot.GetFilteredCards("archivo", null, now, " COMPLETADA ", TrelloCardScope.History).Single() == both,
+        "Combinar historial con tablero y búsqueda sin distinguir mayúsculas.");
+    Check(!snapshot.GetFilteredCards("archivo", null, now, null, TrelloCardScope.Pending).Any(), "Un tablero solo histórico no aporta pendientes.");
+    Check(snapshot.GetFilteredCards(null, TrelloCardStatus.DueSoon, now, null, TrelloCardScope.Pending).Single() == soon,
+        "El filtro temporal no reincorpora completadas ni archivadas.");
+    Check(snapshot.GetCards(TrelloCardScope.Pending).Count(card => card.GetStatus(now, 60) is
+        TrelloCardStatus.Upcoming or TrelloCardStatus.NoDueDate) == 2, "Al día solo incluye futuras y sin fecha pendientes.");
+
+    completed.DueComplete = false;
+    archived.Closed = false;
+    Check(snapshot.GetCards(TrelloCardScope.Pending).Count() == 6 && snapshot.GetCards(TrelloCardScope.History).Single() == both,
+        "Reabrir y restaurar tarjetas las devuelve a pendientes según su estado actual.");
+    var empty = snapshot with { AssignedCards = Array.Empty<TrelloCard>() };
+    Check(!empty.GetCards(TrelloCardScope.History).Any() && empty.GetBoards(TrelloCardScope.History).Count == 0,
+        "Un historial vacío no conserva tarjetas ni opciones anteriores.");
+    return Task.CompletedTask;
+});
+
+await Run("Archivadas conservan el estado de completado y nunca generan avisos", () =>
+{
+    foreach (bool complete in new[] { false, true })
+    {
+        foreach (DateTimeOffset? due in new DateTimeOffset?[] { null, now.AddDays(-1), now.AddMinutes(5) })
+        {
+            TrelloCard card = Card("archivada", due, complete);
+            card.Closed = true;
+            var viewModel = new TrelloCardViewModel(card, now);
+            Check(viewModel.IsArchived && viewModel.StatusText == "Archivada", "Identificar la tarjeta como archivada, sin urgencia temporal.");
+            Check(viewModel.RemainingText == (complete ? "Completada y archivada" : "Archivada sin completar"),
+                "Distinguir archivadas terminadas de archivadas sin completar.");
+            Check(ReminderSchedule.GetEligibleCards(new[] { card }, new AppSettings { IncludeOverdueCards = true }, now).Count == 0,
+                "Excluir archivadas incluso con avisos de vencidas activos.");
+        }
+    }
+    TrelloCard legacy = JsonSerializer.Deserialize<TrelloCard>("{\"id\":\"anterior\"}")!;
+    TrelloCard archived = JsonSerializer.Deserialize<TrelloCard>("{\"id\":\"archivada\",\"closed\":true,\"dueComplete\":false}")!;
+    Check(!legacy.Closed && archived.Closed && !archived.DueComplete, "Leer closed de Trello y conservar compatibilidad si falta.");
+    Check(JsonSerializer.Serialize(archived).Contains("\"closed\":true"), "Conservar el nombre externo del campo.");
+    return Task.CompletedTask;
+});
+
 await Run("Primer aviso y repetición a los 15, 30 y 60 minutos", () =>
 {
     TrelloCard card = Card("tarjeta", now.AddHours(4));
@@ -546,7 +616,8 @@ await Run("Monitor publica todas las asignadas sin ampliar los avisos", async ()
     monitor.Updated += value => snapshot = value;
     await monitor.CheckNowAsync();
     Check(snapshot is { HasError: false, NotifyBeforeMinutes: 120, AssignedCards.Count: 5 }, "Publicar todas las tarjetas y la anticipación usada.");
-    Check(snapshot!.AssignedCards.Select(c => c.Id).SequenceEqual(fixture.Api.Cards.Select(c => c.Id)), "Ningún estado queda excluido del dashboard.");
+    Check(snapshot!.AssignedCards.Select(c => c.Id).SequenceEqual(fixture.Api.Cards.Select(c => c.Id)), "El snapshot conserva todas las abiertas para filtrar localmente.");
+    Check(snapshot.GetCards(TrelloCardScope.Pending).Count() == 4, "El dashboard excluye completadas del snapshot.");
     Check(snapshot.DueSoonCards.Single().Id == "proxima", "Separar candidatas de consulta completa.");
     Check(fixture.Notifications.Batches.Single().Single().Id == "proxima", "Solo avisar de la próxima pendiente.");
 
@@ -599,21 +670,23 @@ await Run("Fallo de API conserva historial y no emite notificaciones", async () 
     Check(fixture.Store.LoadNotifiedCards()["existente|123"] == now && fixture.Notifications.Batches.Count == 0, "No alterar historial ante fallo.");
 });
 
-await Run("Completadas o ausentes dejan de avisar y un nuevo vencimiento se reevalúa", async () =>
+await Run("Completadas, archivadas o ausentes dejan de avisar y un nuevo vencimiento se reevalúa", async () =>
 {
     using var fixture = new Fixture();
     TrelloCard completed = Card("completada", DateTimeOffset.UtcNow.AddMinutes(40));
     TrelloCard removed = Card("ausente", DateTimeOffset.UtcNow.AddMinutes(45));
     TrelloCard changed = Card("cambiada", DateTimeOffset.UtcNow.AddMinutes(50));
-    fixture.Api.Cards = new[] { completed, removed, changed };
+    TrelloCard archived = Card("archivada", DateTimeOffset.UtcNow.AddMinutes(35));
+    fixture.Api.Cards = new[] { completed, removed, changed, archived };
     using var monitor = fixture.CreateMonitor();
     await monitor.CheckNowAsync();
     completed.DueComplete = true;
+    archived.Closed = true;
     changed.Due = changed.Due!.Value.AddMinutes(1);
-    fixture.Api.Cards = new[] { completed, changed };
+    fixture.Api.Cards = new[] { completed, changed, archived };
     await monitor.CheckNowAsync();
     Check(fixture.Notifications.Batches[1].Single().Id == "cambiada", "Solo avisar del nuevo vencimiento.");
-    Check(fixture.Store.LoadNotifiedCards().Count == 1, "Retirar claves completadas, ausentes y del vencimiento anterior.");
+    Check(fixture.Store.LoadNotifiedCards().Count == 1, "Retirar claves completadas, archivadas, ausentes y del vencimiento anterior.");
 });
 
 await Run("Arquitectura: modelos independientes de servicios, UI e IO", () =>

@@ -62,6 +62,11 @@
                         <FontIcon Glyph="&#xE823;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Historial" Tag="History" FontWeight="SemiBold">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <Frame x:Name="ContentFrame" Padding="24" Background="{ThemeResource AppPageBackgroundBrush}" />
         </NavigationView>

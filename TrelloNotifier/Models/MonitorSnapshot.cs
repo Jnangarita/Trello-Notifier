@@ -10,7 +10,16 @@ public sealed record MonitorSnapshot(
     public IReadOnlyList<TrelloCard> AssignedCards { get; init; } = Array.Empty<TrelloCard>();
     public int NotifyBeforeMinutes { get; init; }
 
-    public List<TrelloBoard> GetBoards() => AssignedCards
+    public IEnumerable<TrelloCard> GetCards(TrelloCardScope scope) => scope switch
+    {
+        TrelloCardScope.Pending => AssignedCards.Where(card => !card.DueComplete && !card.Closed),
+        TrelloCardScope.History => AssignedCards.Where(card => card.DueComplete || card.Closed),
+        TrelloCardScope.Completed => AssignedCards.Where(card => card.DueComplete),
+        TrelloCardScope.Archived => AssignedCards.Where(card => card.Closed),
+        _ => AssignedCards
+    };
+
+    public List<TrelloBoard> GetBoards(TrelloCardScope scope = TrelloCardScope.All) => GetCards(scope)
         .Where(card => !string.IsNullOrWhiteSpace(card.BoardId))
         .GroupBy(card => card.BoardId, StringComparer.Ordinal)
         .Select(group => new TrelloBoard
@@ -24,10 +33,11 @@ public sealed record MonitorSnapshot(
         .ToList();
 
     public IEnumerable<TrelloCard> GetFilteredCards(
-        string? boardId, TrelloCardStatus? status, DateTimeOffset now, string? searchText = null)
+        string? boardId, TrelloCardStatus? status, DateTimeOffset now, string? searchText = null,
+        TrelloCardScope scope = TrelloCardScope.All)
     {
         string search = searchText?.Trim() ?? string.Empty;
-        return AssignedCards
+        return GetCards(scope)
             .Where(card => (string.IsNullOrEmpty(boardId) || string.Equals(card.BoardId, boardId, StringComparison.Ordinal)) &&
                 (status is null || card.GetStatus(now, NotifyBeforeMinutes) == status) &&
                 (search.Length == 0 || card.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))

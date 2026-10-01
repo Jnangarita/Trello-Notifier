@@ -161,19 +161,18 @@ Al actualizar desde una versión anterior, la repetición predeterminada es de 3
 
 ### Consultar y filtrar tarjetas
 
-Abre **Mis tarjetas**. Por defecto se muestran **Todas** las tarjetas abiertas asignadas a tu cuenta, sin incluir las archivadas. Usa **Filtrar por estado**:
+Abre **Mis tarjetas**. Por defecto se muestran **Todas las pendientes** asignadas a tu cuenta: tarjetas sin completar y no archivadas. Usa el filtro **Estado**:
 
 | Filtro | Tarjetas incluidas |
 | --- | --- |
-| Todas | Todas las abiertas asignadas, incluidas completadas y sin fecha. |
+| Todas las pendientes | Todas las asignadas sin completar y no archivadas, incluidas las que no tienen fecha. |
 | Vencidas | Pendientes con fecha menor o igual a la hora actual. |
 | Próximas a vencer | Pendientes que vencen después de ahora y hasta el límite de anticipación configurado, inclusive (60 minutos por defecto). |
 | Futuras | Pendientes con vencimiento posterior a ese límite. |
 | Sin fecha | Pendientes sin fecha de vencimiento. |
-| Completadas | Vencimiento marcado como completado en Trello (`dueComplete`), independientemente de la fecha; no es el nombre de una lista del tablero. |
 
 Usa **Filtrar por tablero** para elegir un tablero o **Todos los tableros**.
-El selector incluye los tableros con tarjetas abiertas asignadas en la última
+El selector incluye los tableros con tarjetas pendientes no archivadas asignadas en la última
 consulta y se combina con el filtro por estado. Si no se recibe el nombre de un
 tablero, se muestra su identificador; las tarjetas sin `idBoard` solo aparecen
 en **Todos los tableros**.
@@ -189,19 +188,42 @@ el botón **Abrir en Trello**. En ventanas pequeñas las filas se reorganizan y
 el tablero aparece debajo del título. Si no se recibe el nombre,
 se muestra su identificador; si tampoco está disponible, **Tablero no disponible**.
 
-Los cuatro indicadores resumen todas las tarjetas de la última consulta, sin
-depender de los filtros: **Abiertas**, **Próximas a vencer**, **Vencidas** y
-**Al día**. Este último agrupa futuras, sin fecha y vencimientos completados.
+Los cuatro indicadores resumen las tarjetas pendientes no archivadas de la última consulta, sin
+depender de los filtros: **Pendientes**, **Próximas a vencer**, **Vencidas** y
+**Al día**. Este último agrupa futuras y sin fecha; las completadas y archivadas no se cuentan.
 La anticipación es la configurada para los avisos. Rojo y ámbar identifican
 vencidas y próximas; cada fila también incluye un icono y una etiqueta de estado.
 Un error muestra un aviso y guiones en los indicadores, en lugar de ceros que
 puedan confundirse con una consulta correcta sin tarjetas.
 
-La tabla indica cuántas tarjetas coinciden con la búsqueda y ambos filtros y el
-total consultado. Las tarjetas se muestran por vencimiento y después por nombre,
+La tabla muestra las tarjetas que coinciden con la búsqueda y ambos filtros.
+Las tarjetas se muestran por vencimiento y después por nombre,
 con las tarjetas sin fecha al final.
-Cambiar los filtros utiliza la última consulta y recalcula el estado según la hora actual, sin hacer solicitudes de red ni enviar avisos. Los filtros se mantienen durante las comprobaciones de esa pantalla; si el tablero seleccionado deja de tener tarjetas, se vuelve a **Todos los tableros**. Al volver a abrir la pantalla comienza en **Todas** y **Todos los tableros**.
+Cambiar los filtros utiliza la última consulta y recalcula el estado según la hora actual, sin hacer solicitudes de red ni enviar avisos. Los filtros se mantienen durante las comprobaciones de esa pantalla; si el tablero seleccionado deja de tener tarjetas, se vuelve a **Todos los tableros**. Al volver a abrir la pantalla comienza en **Todas las pendientes** y **Todos los tableros**.
 **Comprobar ahora** actualiza los datos desde Trello y ejecuta la comprobación habitual de recordatorios. También se actualizan automáticamente con el intervalo configurado.
+
+### Consultar el historial de tarjetas
+
+Abre **Historial** para consultar las tarjetas completadas o archivadas que siguen
+asignadas a tu cuenta. La consulta a Trello se realiza al abrir esta vista o pulsar
+**Actualizar historial**, independientemente del monitor de recordatorios.
+
+| Filtro | Tarjetas incluidas |
+| --- | --- |
+| Todas | Completadas o archivadas; una tarjeta con ambos estados aparece una sola vez. |
+| Completadas | Marcadas como completadas (`dueComplete`), archivadas o no. No depende del nombre de la lista en Trello. |
+| Archivadas | Archivadas (`closed`), completadas o no. |
+
+La búsqueda por nombre y el filtro por tablero se combinan con el estado sin
+realizar nuevas consultas. Los tableros disponibles corresponden a las tarjetas
+del historial. Las filas distinguen **Completada y archivada** de **Archivada sin
+completar**; no presentan una archivada como pendiente de recordatorio.
+
+Este historial refleja el **estado actual en Trello**, no una copia permanente ni
+un registro de eventos o notificaciones. Una tarjeta eliminada o que deje de estar
+asignada a ti ya no aparecerá al actualizar; una tarjeta sin completar que se
+desarchive volverá a Mis tarjetas. La fecha mostrada es el vencimiento, no la fecha
+de completado o archivado. No se guardan nuevas tablas ni datos históricos locales.
 
 ## Compilación
 
