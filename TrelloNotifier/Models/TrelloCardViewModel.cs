@@ -12,6 +12,13 @@ public sealed class TrelloCardViewModel
                 : "Tablero no disponible";
         BoardText = string.IsNullOrWhiteSpace(card.BoardName) && string.IsNullOrWhiteSpace(card.BoardId)
             ? BoardName : $"Tablero: {BoardName}";
+        ListName = !string.IsNullOrWhiteSpace(card.ListName)
+            ? card.ListName
+            : !string.IsNullOrWhiteSpace(card.ListId)
+                ? card.ListId
+                : "Lista no disponible";
+        ListText = string.IsNullOrWhiteSpace(card.ListName) && string.IsNullOrWhiteSpace(card.ListId)
+            ? ListName : $"Lista: {ListName}";
         Url = card.Url;
         IsArchived = card.Closed;
         DueText = card.Due?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Sin fecha de vencimiento";
@@ -56,6 +63,8 @@ public sealed class TrelloCardViewModel
     public string Name { get; }
     public string BoardName { get; }
     public string BoardText { get; }
+    public string ListName { get; }
+    public string ListText { get; }
     public string Url { get; }
     public bool IsArchived { get; }
     public string DueText { get; }

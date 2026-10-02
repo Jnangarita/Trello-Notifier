@@ -130,6 +130,12 @@ tarjetas del ejemplo y agrega al mock una respuesta `200` para
 Las respuestas antiguas sin `idBoard` siguen siendo compatibles y no requieren
 esta segunda ruta.
 
+Para mostrar también la lista, añade `"idList": "lista-prueba"` a la tarjeta y
+devuelve las listas dentro de cada tablero en esa misma respuesta:
+`[{"id":"tablero-prueba","name":"Tablero de prueba","lists":[{"id":"lista-prueba","name":"En progreso"}]}]`.
+La consulta de tableros incluye `lists=all`, por lo que el mock puede devolver
+también listas archivadas.
+
 ## Funcionamiento
 
 Por defecto, la aplicación consulta Trello cada **5 minutos**, avisa sobre tarjetas que vencen durante los próximos **60 minutos** y repite sus recordatorios cada **30 minutos** mientras sigan dentro del periodo de aviso.
@@ -176,6 +182,11 @@ El selector incluye los tableros con tarjetas pendientes no archivadas asignadas
 consulta y se combina con el filtro por estado. Si no se recibe el nombre de un
 tablero, se muestra su identificador; las tarjetas sin `idBoard` solo aparecen
 en **Todos los tableros**.
+
+La columna **Lista**, a la derecha de **Tablero**, muestra la lista a la que
+pertenece cada tarjeta. En la vista compacta aparece debajo del tablero. Si no
+se recibe el nombre, se muestra su identificador; si faltan ambos datos,
+aparece **Lista no disponible**. Historial reutiliza esta misma presentación.
 
 Escribe en **Buscar tarjeta…** para buscar por parte del nombre, sin distinguir
 mayúsculas y minúsculas e ignorando espacios al principio y al final del texto.

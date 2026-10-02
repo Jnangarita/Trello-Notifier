@@ -16,6 +16,12 @@ public sealed class TrelloCard
     [JsonIgnore]
     public string? BoardName { get; set; }
 
+    [JsonPropertyName("idList")]
+    public string ListId { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public string? ListName { get; set; }
+
     [JsonPropertyName("due")]
     public DateTimeOffset? Due { get; set; }
 

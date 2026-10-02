@@ -22,17 +22,28 @@ internal sealed class TrelloApiClient
         AppSettings settings, string filter, CancellationToken cancellationToken)
     {
         List<TrelloCard> cards = await GetListAsync<TrelloCard>(settings,
-            $"cards?filter={filter}&fields=id,name,idBoard,due,dueComplete,closed,url", cancellationToken);
+            $"cards?filter={filter}&fields=id,name,idBoard,idList,due,dueComplete,closed,url", cancellationToken);
         if (cards.Any(card => !string.IsNullOrWhiteSpace(card.BoardId)))
         {
             List<TrelloBoard> boards = await GetListAsync<TrelloBoard>(settings,
-                "boards?filter=all&fields=name", cancellationToken);
+                "boards?filter=all&fields=name&lists=all", cancellationToken);
             var names = new Dictionary<string, string>(StringComparer.Ordinal);
+            var listNames = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (TrelloBoard board in boards)
             {
                 if (!string.IsNullOrWhiteSpace(board.Id) && !string.IsNullOrWhiteSpace(board.Name))
                 {
                     names[board.Id] = board.Name;
+                }
+                if (board.Lists is not null)
+                {
+                    foreach (TrelloList list in board.Lists)
+                    {
+                        if (!string.IsNullOrWhiteSpace(list.Id) && !string.IsNullOrWhiteSpace(list.Name))
+                        {
+                            listNames[list.Id] = list.Name;
+                        }
+                    }
                 }
             }
             foreach (TrelloCard card in cards)
@@ -40,6 +51,10 @@ internal sealed class TrelloApiClient
                 if (!string.IsNullOrWhiteSpace(card.BoardId) && names.TryGetValue(card.BoardId, out string? name))
                 {
                     card.BoardName = name;
+                }
+                if (!string.IsNullOrWhiteSpace(card.ListId) && listNames.TryGetValue(card.ListId, out string? listName))
+                {
+                    card.ListName = listName;
                 }
             }
         }

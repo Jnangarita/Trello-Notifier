@@ -19,6 +19,8 @@ identificadores/nombres ausentes, compatibilidad JSON, orden y consultas vacías
 La búsqueda por nombre cubre coincidencias parciales, mayúsculas, espacios,
 nombres nulos y combinación con ambos filtros. La presentación del tablero cubre
 tarjetas completadas/sin fecha y alternativas cuando faltan nombre o identificador.
+La presentación de listas cubre ambos diseños y datos ausentes; el contrato JSON
+cubre `idList`, listas anidadas en tableros y compatibilidad con mocks anteriores.
 Las insignias del dashboard cubren la anticipación personalizada, su límite exacto,
 el paso a vencida y los textos de todos los estados, sin dependencias WinUI.
 Los ámbitos pendiente/historial cubren completadas y archivadas independientes,
@@ -101,8 +103,10 @@ cambie de nombre; si ya no tiene tarjetas, volver a Todos los tableros. Un fallo
 temporal no debe borrar la selección. Cambiar de tablero no debe consultar HTTP.
 Escribir y borrar la búsqueda combinada con ambos filtros; comprobar recuentos,
 estado vacío y conservación del texto al refrescar. Verificar el nombre del
-tablero en su columna (debajo del título en la vista compacta), también con nombres
-largos y datos ausentes. Comprobar los cuatro indicadores: no cambian al filtrar y
+tablero y de la lista en columnas contiguas (debajo del título en la vista compacta),
+también con nombres largos y datos ausentes. Mover una tarjeta de lista y renombrar
+la lista en el mock; comprobar el nombre actualizado al refrescar y las listas
+archivadas en Historial. Comprobar los cuatro indicadores: no cambian al filtrar y
 Al día incluye solo futuras y sin fecha pendientes no archivadas. Un fallo debe mostrar un aviso y
 guiones en los indicadores. Comprobar el orden por vencimiento y después por
 nombre, con las tarjetas sin fecha al final, también al filtrar y refrescar.

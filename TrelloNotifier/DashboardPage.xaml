@@ -172,12 +172,13 @@
                 <Grid RowDefinitions="Auto,*">
                     <Border x:Name="TableHeadings" Background="{ThemeResource AppControlBackgroundBrush}"
                             BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="20,9">
-                        <Grid ColumnDefinitions="2.2*,1.35*,1.45*,120,150" ColumnSpacing="16">
+                        <Grid ColumnDefinitions="2.2*,1.35*,1.35*,1.45*,120,150" ColumnSpacing="16">
                             <TextBlock Text="TARJETA" Style="{StaticResource TableHeadingStyle}" />
                             <TextBlock Grid.Column="1" Text="TABLERO" Style="{StaticResource TableHeadingStyle}" />
-                            <TextBlock Grid.Column="2" Text="VENCIMIENTO" Style="{StaticResource TableHeadingStyle}" />
-                            <TextBlock Grid.Column="3" Text="ESTADO" Style="{StaticResource TableHeadingStyle}" />
-                            <TextBlock Grid.Column="4" Text="ACCIÓN" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="2" Text="LISTA" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="3" Text="VENCIMIENTO" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="4" Text="ESTADO" Style="{StaticResource TableHeadingStyle}" />
+                            <TextBlock Grid.Column="5" Text="ACCIÓN" Style="{StaticResource TableHeadingStyle}" />
                         </Grid>
                     </Border>
                     <Grid Grid.Row="1">
@@ -239,17 +240,19 @@
                                                             <AdaptiveTrigger MinWindowWidth="0" />
                                                         </VisualState.StateTriggers>
                                                         <VisualState.Setters>
-                                                            <Setter Target="TitleCell.(Grid.ColumnSpan)" Value="5" />
+                                                            <Setter Target="TitleCell.(Grid.ColumnSpan)" Value="6" />
                                                             <Setter Target="TitleCell.Margin" Value="0,0,0,12" />
                                                             <Setter Target="CompactBoard.Visibility" Value="Visible" />
+                                                            <Setter Target="CompactList.Visibility" Value="Visible" />
                                                             <Setter Target="BoardCell.Visibility" Value="Collapsed" />
+                                                            <Setter Target="ListCell.Visibility" Value="Collapsed" />
                                                             <Setter Target="CardStatusColumn.Width" Value="0" />
                                                             <Setter Target="DueContent.(Grid.Row)" Value="1" />
                                                             <Setter Target="DueContent.(Grid.Column)" Value="0" />
-                                                            <Setter Target="DueContent.(Grid.ColumnSpan)" Value="3" />
+                                                            <Setter Target="DueContent.(Grid.ColumnSpan)" Value="4" />
                                                             <Setter Target="StatusBadge.(Grid.Row)" Value="2" />
                                                             <Setter Target="StatusBadge.(Grid.Column)" Value="0" />
-                                                            <Setter Target="StatusBadge.(Grid.ColumnSpan)" Value="3" />
+                                                            <Setter Target="StatusBadge.(Grid.ColumnSpan)" Value="4" />
                                                             <Setter Target="StatusBadge.Margin" Value="0,10,0,0" />
                                                             <Setter Target="OpenCardButton.(Grid.Row)" Value="1" />
                                                             <Setter Target="OpenCardButton.(Grid.RowSpan)" Value="2" />
@@ -267,6 +270,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="2.2*" />
                                                         <ColumnDefinition Width="1.35*" />
+                                                        <ColumnDefinition Width="1.35*" />
                                                         <ColumnDefinition Width="1.45*" />
                                                         <ColumnDefinition x:Name="CardStatusColumn" Width="120" />
                                                         <ColumnDefinition Width="150" />
@@ -278,10 +282,12 @@
                                                         <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                                             <TextBlock x:Name="CompactBoard" Text="{Binding BoardText}" Style="{StaticResource CaptionTextStyle}" Visibility="Collapsed" />
+                                                            <TextBlock x:Name="CompactList" Text="{Binding ListText}" Style="{StaticResource CaptionTextStyle}" Visibility="Collapsed" />
                                                         </StackPanel>
                                                     </Grid>
                                                     <TextBlock x:Name="BoardCell" Grid.Column="1" Text="{Binding BoardName}" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
-                                                    <UserControl x:Name="DueContent" Grid.Column="2" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" IsTabStop="False">
+                                                    <TextBlock x:Name="ListCell" Grid.Column="2" Text="{Binding ListName}" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
+                                                    <UserControl x:Name="DueContent" Grid.Column="3" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" IsTabStop="False">
                                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                                             <FontIcon Glyph="&#xE787;" FontSize="20" />
                                                             <StackPanel Grid.Column="1" Spacing="4">
@@ -290,7 +296,7 @@
                                                             </StackPanel>
                                                         </Grid>
                                                     </UserControl>
-                                                    <Border x:Name="StatusBadge" Grid.Column="3" Style="{StaticResource AccentBadgeStyle}" Padding="10,8" VerticalAlignment="Center">
+                                                    <Border x:Name="StatusBadge" Grid.Column="4" Style="{StaticResource AccentBadgeStyle}" Padding="10,8" VerticalAlignment="Center">
                                                         <UserControl x:Name="StatusContent" Foreground="{ThemeResource AppAccentTextBrush}" IsTabStop="False">
                                                             <StackPanel Orientation="Horizontal" Spacing="7">
                                                                 <FontIcon x:Name="StateIcon" Glyph="&#xE73E;" FontSize="16" />
@@ -298,7 +304,7 @@
                                                             </StackPanel>
                                                         </UserControl>
                                                     </Border>
-                                                    <Button x:Name="OpenCardButton" Grid.Column="4" Tag="{Binding Url}" Style="{StaticResource ActionButtonStyle}"
+                                                    <Button x:Name="OpenCardButton" Grid.Column="5" Tag="{Binding Url}" Style="{StaticResource ActionButtonStyle}"
                                                             Click="OpenCard_Click" HorizontalAlignment="Stretch" VerticalAlignment="Center" AutomationProperties.Name="Abrir en Trello">
                                                         <StackPanel Orientation="Horizontal" Spacing="10">
                                                             <TextBlock Text="Abrir en Trello" />

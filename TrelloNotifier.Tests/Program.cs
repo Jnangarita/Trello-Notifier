@@ -83,6 +83,52 @@ await Run("Nombre del tablero visible también en tarjetas completadas y sin fec
     return Task.CompletedTask;
 });
 
+await Run("Lista visible en tabla y vista compacta con alternativas para datos ausentes", () =>
+{
+    foreach (TrelloCard card in new[] { Card("pendiente", now.AddMinutes(10)), Card("completada", null, true), Card("sin-fecha", null) })
+    {
+        card.ListId = "lista-prueba";
+        card.ListName = "En progreso";
+        var viewModel = new TrelloCardViewModel(card, now);
+        Check(viewModel.ListName == "En progreso" && viewModel.ListText == "Lista: En progreso", "Mostrar el nombre de lista en ambos diseños.");
+        foreach (string? missingName in new string?[] { null, "", " " })
+        {
+            card.ListName = missingName;
+            viewModel = new TrelloCardViewModel(card, now);
+            Check(viewModel.ListName == "lista-prueba" && viewModel.ListText == "Lista: lista-prueba", "Usar ID cuando falta el nombre.");
+        }
+        card.ListId = string.Empty;
+        viewModel = new TrelloCardViewModel(card, now);
+        Check(viewModel.ListName == "Lista no disponible" && viewModel.ListText == "Lista no disponible", "Informar ausencia sin etiqueta vacía.");
+    }
+    return Task.CompletedTask;
+});
+
+await Run("Contrato de listas compatible con respuestas anteriores y valores nulos", () =>
+{
+    TrelloCard card = JsonSerializer.Deserialize<TrelloCard>("""
+        { "id": "tarjeta", "idList": "lista-prueba" }
+        """)!;
+    TrelloBoard board = JsonSerializer.Deserialize<TrelloBoard>("""
+        { "id": "tablero", "name": "Equipo", "lists": [{ "id": "lista-prueba", "name": "En progreso" }] }
+        """)!;
+    Check(board.Lists!.Single().Id == card.ListId && board.Lists.Single().Name == "En progreso", "Leer listas anidadas e identidad de la tarjeta.");
+    card.ListName = board.Lists.Single().Name;
+    string serialized = JsonSerializer.Serialize(card);
+    Check(serialized.Contains("\"idList\":\"lista-prueba\"") && !serialized.Contains("ListName"), "Conservar contrato externo y excluir nombre enriquecido.");
+    foreach (string json in new[] { "{}", "{\"idList\":null}", "{\"idList\":\" \"}" })
+    {
+        TrelloCard legacy = JsonSerializer.Deserialize<TrelloCard>(json)!;
+        Check(new TrelloCardViewModel(legacy, now).ListName == "Lista no disponible", "Aceptar tarjetas sin lista.");
+    }
+    foreach (string json in new[] { "{}", "{\"lists\":null}", "{\"lists\":[]}" })
+    {
+        TrelloBoard legacy = JsonSerializer.Deserialize<TrelloBoard>(json)!;
+        Check(legacy.Lists is null || legacy.Lists.Count == 0, "Aceptar tableros de mocks anteriores sin listas.");
+    }
+    return Task.CompletedTask;
+});
+
 await Run("Insignias del dashboard respetan la anticipación y los estados especiales", () =>
 {
     (TrelloCard Card, TrelloCardStatus Status, string Text)[] cases =
