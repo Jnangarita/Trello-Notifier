@@ -12,6 +12,12 @@ del hilo UI. También retira el import no usado y su excepción de lint en
 Los puntos siguientes conservan el diagnóstico histórico; consultar el ADR 004
 para el almacenamiento actual.
 
+Actualización de logging: `AppLog` sustituye la escritura de excepciones completas
+en `crash.log` por logs de texto con propiedades técnicas permitidas, rotación y escritura
+asíncrona. Los fallos de registro de notificaciones ya se registran. Se conservan
+el diagnóstico histórico inferior y la deuda de algunos `ex.Message` en la UI;
+los antiguos `crash.log` no se eliminan.
+
 ## Seguridad
 | Hallazgo | Evidencia / consecuencia |
 | --- | --- |

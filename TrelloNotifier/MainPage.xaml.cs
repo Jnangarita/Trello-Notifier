@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TrelloNotifier.Models;
+using TrelloNotifier.Services;
 
 namespace TrelloNotifier;
 
@@ -39,6 +40,7 @@ public sealed partial class MainPage : Page
         }
         catch (IOException ex)
         {
+            AppLog.WriteFailure("LoadTheme", ex);
             ShowMessage(ex.Message, InfoBarSeverity.Error);
         }
     }

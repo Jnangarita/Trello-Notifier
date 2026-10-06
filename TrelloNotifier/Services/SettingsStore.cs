@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using Serilog;
 using TrelloNotifier.Models;
 
 namespace TrelloNotifier.Services;
@@ -47,6 +48,7 @@ internal sealed class SettingsStore
     public void Save(AppSettings settings) => WithConnection(connection =>
     {
         WriteSettings(connection, null, settings);
+        Log.ForContext<SettingsStore>().Information("Configuración guardada");
         return true;
     });
 
@@ -77,6 +79,7 @@ internal sealed class SettingsStore
         command.ExecuteNonQuery();
         WriteHistory(connection, transaction, notifiedCards);
         transaction.Commit();
+        Log.ForContext<SettingsStore>().Debug("Historial de avisos guardado");
         return true;
     });
 
@@ -149,6 +152,7 @@ internal sealed class SettingsStore
         command.CommandText = "PRAGMA user_version = 1;";
         command.ExecuteNonQuery();
         transaction.Commit();
+        Log.ForContext<SettingsStore>().Information("Base local inicializada e importación de datos anteriores completada. Esquema {SchemaVersion}", SchemaVersion);
     }
 
     private static int ReadSchemaVersion(SqliteConnection connection, SqliteTransaction? transaction)

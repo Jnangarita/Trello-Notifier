@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using Serilog;
+using Serilog.Context;
 using TrelloNotifier.Models;
 
 namespace TrelloNotifier.Services;
@@ -29,6 +32,7 @@ internal sealed class DueCardMonitor : IDisposable
         _cancellationTokenSource = new CancellationTokenSource();
         CancellationToken token = _cancellationTokenSource.Token;
         _monitorTask = Task.Run(() => RunAsync(token), token);
+        Log.ForContext<DueCardMonitor>().Information("Monitor iniciado");
     }
 
     public async Task CheckNowAsync(CancellationToken cancellationToken = default)
@@ -50,6 +54,7 @@ internal sealed class DueCardMonitor : IDisposable
 
     private void Stop()
     {
+        if (_cancellationTokenSource is not null) Log.ForContext<DueCardMonitor>().Information("Parada del monitor solicitada");
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
@@ -67,6 +72,7 @@ internal sealed class DueCardMonitor : IDisposable
                 pollIntervalMinutes = settings.PollIntervalMinutes;
                 if (!settings.IsConfigured)
                 {
+                    Log.ForContext<DueCardMonitor>().Information("Monitor en espera de configuración");
                     Updated?.Invoke(new MonitorSnapshot(
                         false,
                         "Configura la conexión con Trello o con un servidor simulado para iniciar el monitor.",
@@ -79,6 +85,7 @@ internal sealed class DueCardMonitor : IDisposable
             }
             catch (IOException ex)
             {
+                AppLog.WriteFailure("LoadMonitorSettings", ex);
                 // Un bloqueo o una importación fallida debe ser visible y permitir reintento.
                 Updated?.Invoke(new MonitorSnapshot(
                     true,
@@ -106,11 +113,17 @@ internal sealed class DueCardMonitor : IDisposable
     private async Task CheckAsync(CancellationToken cancellationToken)
     {
         await _checkLock.WaitAsync(cancellationToken);
+        using IDisposable checkContext = LogContext.PushProperty("CheckId", Guid.NewGuid().ToString("N"));
+        var stopwatch = Stopwatch.StartNew();
+        string operation = "LoadSettings";
+        string outcome = "Failed";
+        Log.ForContext<DueCardMonitor>().Debug("Comprobación iniciada");
         try
         {
             AppSettings settings = _settingsStore.Load();
             if (!settings.IsConfigured)
             {
+                outcome = "NotConfigured";
                 Updated?.Invoke(new MonitorSnapshot(
                     false,
                     "Falta configurar la conexión con Trello.",
@@ -119,10 +132,12 @@ internal sealed class DueCardMonitor : IDisposable
                 return;
             }
 
+            operation = "GetOpenCards";
             IReadOnlyList<TrelloCard> cards = await _trelloApi.GetOpenCardsAsync(settings, cancellationToken);
             DateTimeOffset now = DateTimeOffset.Now;
             List<TrelloCard> eligibleCards = ReminderSchedule.GetEligibleCards(cards, settings, now);
 
+            operation = "LoadNotificationHistory";
             Dictionary<string, DateTimeOffset> notifiedCards = _settingsStore.LoadNotifiedCards();
             HashSet<string> currentCardKeys = cards
                 .Where(card => card.Due is not null && !card.DueComplete && !card.Closed)
@@ -138,6 +153,7 @@ internal sealed class DueCardMonitor : IDisposable
             List<TrelloCard> reminders = eligibleCards
                 .Where(card => ReminderSchedule.ShouldNotify(card, settings, notifiedCards, now))
                 .ToList();
+            operation = "SendDueNotifications";
             if (reminders.Count > 0 && _notifications.ShowDueCards(reminders, settings.PlaySound, now))
             {
                 foreach (TrelloCard card in reminders)
@@ -149,6 +165,7 @@ internal sealed class DueCardMonitor : IDisposable
 
             if (notificationStateChanged)
             {
+                operation = "SaveNotificationHistory";
                 _settingsStore.SaveNotifiedCards(notifiedCards);
             }
 
@@ -158,17 +175,23 @@ internal sealed class DueCardMonitor : IDisposable
                 : $"Para avisos: {eligibleCards.Count - overdueCount} tarjeta(s) próxima(s) a vencer" +
                   $" y {overdueCount} vencida(s) pendiente(s).";
             string message = $"Monitor activo. {cards.Count} tarjeta(s) abierta(s) asignada(s). {reminderMessage}";
+            Log.ForContext<DueCardMonitor>().Information("Tarjetas evaluadas: {CardCount}; candidatas: {EligibleCount}; avisos solicitados: {ReminderCount}",
+                cards.Count, eligibleCards.Count, reminders.Count);
+            operation = "PublishSnapshot";
             Updated?.Invoke(new MonitorSnapshot(true, message, now, eligibleCards)
             {
                 AssignedCards = cards,
                 NotifyBeforeMinutes = settings.NotifyBeforeMinutes
             });
+            outcome = "Succeeded";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            outcome = "Cancelled";
         }
         catch (Exception ex)
         {
+            AppLog.WriteFailure(operation, ex);
             Updated?.Invoke(new MonitorSnapshot(
                 true,
                 ex.Message,
@@ -178,6 +201,7 @@ internal sealed class DueCardMonitor : IDisposable
         }
         finally
         {
+            Log.ForContext<DueCardMonitor>().Information("Comprobación finalizada: {Outcome}; duración {DurationMs} ms", outcome, stopwatch.ElapsedMilliseconds);
             _checkLock.Release();
         }
     }

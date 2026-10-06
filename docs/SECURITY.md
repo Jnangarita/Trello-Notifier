@@ -33,8 +33,14 @@ los archivos auxiliares `.db-journal`, `.db-wal` y `.db-shm`.
 ## Información sensible y errores
 No registrar contraseñas, access tokens, query strings autenticadas, nombres de
 tarjetas privadas ni dumps de configuración. La API usa credenciales en query:
-redactar URL completa en diagnósticos. `crash.log` hoy almacena excepciones
-completas y la UI muestra algunos `ex.Message`; revisar sin compartir datos reales.
+excluir URL completa en diagnósticos. `AppLog.WriteFailure` usa una lista permitida
+de propiedades técnicas (operación constante, tipo, HResult y métodos sin rutas),
+sin mensaje, Data ni excepciones internas. Serilog escribe texto `.log` en LocalAppData
+con rotación, retención de 14 archivos y cola limitada; su diagnóstico interno
+se sustituye por una advertencia fija para no revelar rutas o excepciones.
+Los archivos `*.log` y los antiguos `trello-notifier-*.jsonl` están excluidos de Git y búsquedas.
+Ya no se escribe `crash.log`; las copias antiguas pueden contener excepciones
+completas y la UI todavía muestra algunos `ex.Message`. No compartir datos reales.
 Las notificaciones muestran nombres de tarjetas, visibles en el escritorio.
 No agregar telemetría o payloads de log sin necesidad funcional.
 

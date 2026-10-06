@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TrelloNotifier.Models;
+using TrelloNotifier.Services;
 
 namespace TrelloNotifier;
 
@@ -21,6 +22,7 @@ public sealed partial class SettingsPage : Page
         }
         catch (IOException ex)
         {
+            AppLog.WriteFailure("LoadSettingsPage", ex);
             MainPage.Current?.ShowMessage(ex.Message, InfoBarSeverity.Error);
         }
     }
@@ -62,6 +64,7 @@ public sealed partial class SettingsPage : Page
         }
         catch (IOException ex)
         {
+            AppLog.WriteFailure("SaveSettings", ex);
             MainPage.Current?.ShowMessage(ex.Message, InfoBarSeverity.Error);
         }
         finally
@@ -86,18 +89,27 @@ public sealed partial class SettingsPage : Page
         }
         catch (Exception ex)
         {
+            AppLog.WriteFailure("TestConnection", ex);
             MainPage.Current?.ShowMessage(ex.Message, InfoBarSeverity.Error);
         }
     }
 
     private void TestNotification_Click(object sender, RoutedEventArgs e)
     {
-        bool wasShown = AppServices.Notifications.ShowTest(SoundCheckBox.IsChecked == true);
-        MainPage.Current?.ShowMessage(
-            wasShown
-                ? "Notificación de prueba enviada."
-                : "Windows no permitió registrar la aplicación para mostrar notificaciones.",
-            wasShown ? InfoBarSeverity.Success : InfoBarSeverity.Error);
+        try
+        {
+            bool wasShown = AppServices.Notifications.ShowTest(SoundCheckBox.IsChecked == true);
+            MainPage.Current?.ShowMessage(
+                wasShown
+                    ? "Notificación de prueba enviada."
+                    : "Windows no permitió registrar la aplicación para mostrar notificaciones.",
+                wasShown ? InfoBarSeverity.Success : InfoBarSeverity.Error);
+        }
+        catch (Exception ex)
+        {
+            AppLog.WriteFailure("TestNotification", ex);
+            MainPage.Current?.ShowMessage("No se pudo enviar la notificación de prueba a Windows.", InfoBarSeverity.Error);
+        }
     }
 
     private void Theme_SelectionChanged(object sender, SelectionChangedEventArgs e)

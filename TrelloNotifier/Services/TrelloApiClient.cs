@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
+using Serilog;
 using TrelloNotifier.Models;
 
 namespace TrelloNotifier.Services;
@@ -76,14 +78,29 @@ internal sealed class TrelloApiClient
             url += $"&token={Uri.EscapeDataString(settings.Token.Trim())}";
         }
 
-        using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var stopwatch = Stopwatch.StartNew();
+        int? statusCode = null;
+        bool succeeded = false;
+        try
         {
-            throw new HttpRequestException(
-                $"El servidor respondió {(int)response.StatusCode} ({response.ReasonPhrase}). Verifica la URL y las credenciales.");
-        }
+            using HttpResponseMessage response = await _httpClient.GetAsync(url, cancellationToken);
+            statusCode = (int)response.StatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"El servidor respondió {(int)response.StatusCode} ({response.ReasonPhrase}). Verifica la URL y las credenciales.");
+            }
 
-        return await response.Content.ReadFromJsonAsync<List<T>>(cancellationToken: cancellationToken)
-            ?? new List<T>();
+            List<T> result = await response.Content.ReadFromJsonAsync<List<T>>(cancellationToken: cancellationToken)
+                ?? new List<T>();
+            succeeded = true;
+            return result;
+        }
+        finally
+        {
+            // El tipo identifica el recurso sin registrar URL, query, host ni respuesta.
+            Log.ForContext<TrelloApiClient>().Information("Consulta HTTP {ResourceType}: estado {StatusCode}; éxito {Succeeded}; cancelada {Cancelled}; duración {DurationMs} ms",
+                typeof(T).Name, statusCode, succeeded, cancellationToken.IsCancellationRequested, stopwatch.ElapsedMilliseconds);
+        }
     }
 }

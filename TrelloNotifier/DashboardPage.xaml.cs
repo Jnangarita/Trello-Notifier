@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using TrelloNotifier.Models;
+using TrelloNotifier.Services;
 
 namespace TrelloNotifier;
 
@@ -120,6 +121,7 @@ public sealed partial class DashboardPage : Page
             (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             // Los errores de transporte pueden contener la URL autenticada.
+            AppLog.WriteFailure("RefreshHistory", ex);
             snapshot = new MonitorSnapshot(true,
                 "No se pudo consultar el historial. Revisa la conexión y la configuración e inténtalo de nuevo.",
                 null, Array.Empty<TrelloCard>(), true);

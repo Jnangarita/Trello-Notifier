@@ -141,3 +141,20 @@ sin secretos, antes de publicar. Orden lógico: FORMAT → LINT → STATIC ANALY
 El script reúne análisis y build para evitar duplicarlos. Si se distribuye una
 versión, añadir después el publish Release e Inno Setup documentados en README.
 No sustituir la suite por `dotnet test TrelloNotifier.sln`.
+
+## Logging
+
+El runner enlaza `AppLog` real y usa Serilog File/Async en carpetas de `Fixture`.
+Comprueba que el cierre vacía la cola, que los niveles Information/Debug y los
+timeouts se distinguen, que un destino inaccesible no impide usar persistencia
+y que el monitor correlaciona fallo/recuperación sin falsas alarmas al cancelar.
+Los errores usan secretos ficticios en Message, Data y excepciones internas
+para verificar su ausencia en los archivos de texto; también se comprueba la cabecera
+tipo Spring Boot, el componente y la correlación. No se leen logs ni configuración del usuario.
+No se consulta la API real ni se emiten notificaciones Windows en estas pruebas.
+
+Comprobación manual de diagnóstico: iniciar la app con un mock sin credenciales,
+comprobar una consulta correcta y otra fallida, probar notificación y cerrar.
+Verificar registros locales, código HTTP, conteos, CheckId y cierre sin contenido
+privado; activar Debug mediante la variable de entorno y reiniciar. Comprobar
+también el aviso de arranque ante un destino sin permisos en un perfil de prueba.

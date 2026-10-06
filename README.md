@@ -22,6 +22,7 @@ La interfaz y la distribución del proyecto parten de la plantilla WinUI 3 de `c
 - Notificación local de prueba sin conectarse a Trello.
 - URL de API configurable para usar Postman Mock Server u otro servidor simulado.
 - Inicio automático con Windows opcional desde el instalador.
+- Logs locales estructurados con rotación automática para diagnóstico.
 
 ## Requisitos
 
@@ -86,6 +87,53 @@ Si aparece **Conexión correcta. El servidor devolvió 0 tarjeta(s) abierta(s).*
 La aplicación avisa de tarjetas próximas a vencer y, opcionalmente, de vencidas pendientes; no replica las notificaciones de comentarios o menciones de Trello.
 
 Referencia: [documentación oficial de autorización de Trello](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
+
+## Logs y diagnóstico
+
+Los logs se guardan automáticamente en:
+
+```text
+%LOCALAPPDATA%\Trello Notifier\Logs\trello-notifier-AAAAMMDD.log
+```
+
+Al iniciar la aplicación se escribe un banner ASCII de Trello Notifier con la
+versión del ensamblado y el lema «Tus pendientes, a tiempo.». Se registra una vez
+por ejecución, como un evento de inicio multilínea en el mismo archivo `.log`.
+
+Los eventos usan texto con un formato similar al de Spring Boot: fecha ISO 8601,
+nivel (`INFO`, `WARN`, `ERROR`, `DEBUG`, `FATAL`), PID, aplicación, componente y
+mensaje. Por ejemplo, con identificadores ficticios:
+
+```text
+2026-10-05T14:30:00.123-05:00  INFO 1234 --- [TrelloNotifier] TrelloNotifier.Services.DueCardMonitor            : Comprobación finalizada: Succeeded; duración 420 ms [session=0123456789abcdef0123456789abcdef check=abcdef0123456789abcdef0123456789]
+```
+
+Se registran inicio, versión, cierre normal, resultados HTTP, comprobaciones del monitor, envío de
+avisos y fallos. `session` identifica la ejecución y `check` relaciona los
+eventos de una comprobación. Que Windows acepte un aviso no demuestra que el
+usuario lo haya visto.
+
+- Rotación diaria y al alcanzar aproximadamente **5 MiB**; se conservan los
+  **14 archivos** más recientes (no necesariamente 14 días). Un evento puede
+  superar el umbral antes de abrir el siguiente archivo.
+- Nivel **Information** por defecto. Para habilitar **Debug**, define la variable
+  de entorno `TRELLO_NOTIFIER_LOG_LEVEL=Debug` antes de iniciar la aplicación.
+  Al quitarla y reiniciar se vuelve al nivel normal. No cambia la base de datos.
+- Escritura en segundo plano con cola de 1000 eventos. Si se llena, se descartan
+  nuevos eventos para no bloquear la interfaz. El cierre normal vacía la cola;
+  un cierre forzado puede perder los últimos eventos.
+- No se registran credenciales, URLs, contenido de tarjetas, configuración ni
+  mensajes completos de excepciones. Los errores conservan operación, tipo,
+  código y métodos de la app, sin rutas de archivos ni excepciones internas.
+- Un fallo del logger no impide usar la aplicación. Si se detecta al arrancar,
+  se muestra un aviso; los fallos internos o de cola también generan una advertencia
+  genérica mediante `Trace`, visible con un listener de diagnóstico, sin datos privados.
+
+La plantilla de texto de Serilog y sus salidas File/Async gestionan formato,
+rotación y cola. Los logs son locales: no se envían a ningún servidor.
+Ya no se escribe `crash.log` junto al
+ejecutable; los archivos antiguos no se eliminan automáticamente. No adjuntes
+datos locales o logs reales al repositorio ni a herramientas de IA.
 
 ## Probar sin Trello
 

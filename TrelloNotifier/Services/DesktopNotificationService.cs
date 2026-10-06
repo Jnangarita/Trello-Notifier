@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
+using Serilog;
 using TrelloNotifier.Models;
 
 namespace TrelloNotifier.Services;
@@ -16,10 +17,12 @@ internal sealed class DesktopNotificationService : IDisposable
             AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
             AppNotificationManager.Default.Register();
             _isRegistered = true;
+            Log.ForContext<DesktopNotificationService>().Information("Servicio de notificaciones registrado en Windows");
         }
-        catch
+        catch (Exception ex)
         {
             _isRegistered = false;
+            AppLog.WriteFailure("InitializeNotifications", ex);
         }
     }
 
@@ -27,6 +30,7 @@ internal sealed class DesktopNotificationService : IDisposable
     {
         if (!_isRegistered || cards.Count == 0)
         {
+            if (!_isRegistered) Log.ForContext<DesktopNotificationService>().Warning("Aviso omitido: servicio de notificaciones no registrado");
             return false;
         }
 
@@ -67,6 +71,7 @@ internal sealed class DesktopNotificationService : IDisposable
 
         AppNotification notification = builder.BuildNotification();
         AppNotificationManager.Default.Show(notification);
+        Log.ForContext<DesktopNotificationService>().Information("Envío de aviso a Windows: aceptado {Accepted}; tarjetas {CardCount}", notification.Id != 0, cards.Count);
         return notification.Id != 0;
     }
 
@@ -74,6 +79,7 @@ internal sealed class DesktopNotificationService : IDisposable
     {
         if (!_isRegistered)
         {
+            Log.ForContext<DesktopNotificationService>().Warning("Prueba de aviso omitida: servicio de notificaciones no registrado");
             return false;
         }
 
@@ -90,6 +96,7 @@ internal sealed class DesktopNotificationService : IDisposable
 
         AppNotification notification = builder.BuildNotification();
         AppNotificationManager.Default.Show(notification);
+        Log.ForContext<DesktopNotificationService>().Information("Envío de aviso de prueba a Windows: aceptado {Accepted}", notification.Id != 0);
         return notification.Id != 0;
     }
 

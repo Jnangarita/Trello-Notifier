@@ -6,6 +6,7 @@ artifacts/
 *.user
 *.suo
 *.log
+trello-notifier-*.jsonl
 *.db
 *.db-journal
 *.db-wal

@@ -38,6 +38,15 @@ al salir y no persiste tarjetas. Ambas vistas reutilizan filas, estilos y
 urgencia temporal. El monitor actualiza controles mediante `DispatcherQueue`.
 La UI contiene coordinación en code-behind.
 
+`App` inicializa `Services/AppLog` antes de usar `AppServices` y vacía Serilog al
+cerrar o ante un fallo fatal. Los servicios y las fronteras de UI usan el logger
+compartido; modelos y calendario siguen sin logging. `AppLog` configura texto `.log` en
+LocalAppData con Serilog File + Async (cola limitada no bloqueante), limita los
+datos de excepción a propiedades técnicas y observa fallos internos sin copiar
+su contenido. `LogContext` propaga `CheckId` dentro de una comprobación. Los
+errores se registran donde se capturan y los servicios añaden resultados/tiempos.
+No se incorpora un contenedor DI ni persistencia de logs en SQLite.
+
 ## Responsabilidades y dependencias
 | Área | Permitido actualmente | No introducir |
 | --- | --- | --- |

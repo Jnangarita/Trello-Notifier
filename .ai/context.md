@@ -40,6 +40,12 @@ ambos JSON anteriores en una transacción y conserva los originales como respald
 y el monitor ejecutan el IO SQLite síncrono fuera del hilo UI. `DesktopNotificationService`
 encapsula las notificaciones de Windows y usa `App.GetAssetPath` para el icono.
 
+`AppLog` configura Serilog File + Async: texto `.log` estilo Spring Boot en `%LOCALAPPDATA%\Trello Notifier\Logs`,
+rotación diaria/5 MiB, 14 archivos y cola no bloqueante de 1000 eventos. `App`
+inicializa y vacía el logger; `CheckId` correlaciona el monitor. Registrar errores
+con `AppLog.WriteFailure` (tipo/código/métodos sin mensajes ni rutas), no pasar
+excepciones completas a Serilog. `TRELLO_NOTIFIER_LOG_LEVEL=Debug` habilita detalle.
+
 ## Restricciones que suelen importar
 Reutilizar antes de extender o crear. Mantener modelos sin dependencias de UI o
 servicios y calendario sin IO. No duplicar selección de tarjetas, intervalos,

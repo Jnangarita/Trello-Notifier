@@ -7,12 +7,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\TrelloNotifier\Models\*.cs" Link="Models\%(Filename)%(Extension)" />
     <Compile Include="..\TrelloNotifier\Services\ReminderSchedule.cs" Link="Services\ReminderSchedule.cs" />
     <Compile Include="..\TrelloNotifier\Services\SettingsStore.cs" Link="Services\SettingsStore.cs" />
     <Compile Include="..\TrelloNotifier\Services\DueCardMonitor.cs" Link="Services\DueCardMonitor.cs" />
+    <Compile Include="..\TrelloNotifier\Services\AppLog.cs" Link="Services\AppLog.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Roslyn ya forma parte del SDK .NET 9; solo se usa en los guards de arquitectura. -->

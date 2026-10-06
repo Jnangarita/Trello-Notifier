@@ -1,5 +1,8 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using Serilog;
+using Serilog.Context;
 using TrelloNotifier.Models;
 using TrelloNotifier.Services;
 using TrelloNotifier.Tests;
@@ -733,6 +736,154 @@ await Run("Completadas, archivadas o ausentes dejan de avisar y un nuevo vencimi
     await monitor.CheckNowAsync();
     Check(fixture.Notifications.Batches[1].Single().Id == "cambiada", "Solo avisar del nuevo vencimiento.");
     Check(fixture.Store.LoadNotifiedCards().Count == 1, "Retirar claves completadas, archivadas, ausentes y del vencimiento anterior.");
+});
+
+await Run("Logs: errores sin secretos y vaciado de la cola al cerrar", () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    string logsPath = Path.Combine(fixture.DirectoryPath, "Logs");
+    AppLog.Initialize(logsPath);
+    try
+    {
+        using IDisposable context = LogContext.PushProperty("CheckId", "comprobacion-ficticia");
+        try
+        {
+            var error = new HttpRequestException("https://mock.invalid/?key=CLAVE_FICTICIA&token=TOKEN_FICTICIO",
+                new IOException("TARJETA_PRIVADA_FICTICIA"));
+            error.Data["settings"] = "CONFIGURACION_PRIVADA_FICTICIA";
+            throw error;
+        }
+        catch (HttpRequestException ex)
+        {
+            AppLog.WriteFailure("TestSafeFailure", ex);
+        }
+        Log.Debug("DETALLE_SOLO_DEBUG");
+        for (int i = 0; i < 40; i++) Log.ForContext<SettingsStore>().Information("Evento de prueba {Sequence}", i);
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    string[] lines = Directory.GetFiles(logsPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
+    Check(lines.Length == 41, "El cierre vacía los eventos pendientes y filtra Debug por defecto.");
+    string text = string.Join('\n', lines);
+    foreach (string secret in new[] { "CLAVE_FICTICIA", "TOKEN_FICTICIO", "TARJETA_PRIVADA_FICTICIA", "CONFIGURACION_PRIVADA_FICTICIA", "mock.invalid", "DETALLE_SOLO_DEBUG" })
+    {
+        Check(!text.Contains(secret, StringComparison.Ordinal), "Excluir mensajes, datos, URL e interiores de excepciones.");
+    }
+    Match header = Regex.Match(lines[0], @"^(?<timestamp>\S+)\s+ERROR\s+(?<pid>\d+) --- \[TrelloNotifier\] Program\s+: ",
+        RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    Check(header.Success && DateTimeOffset.TryParse(header.Groups["timestamp"].Value, out _), "Cabecera de texto con fecha, nivel y componente al estilo Spring Boot.");
+    Check(header.Groups["pid"].Value == Environment.ProcessId.ToString(), "Identificar el proceso real.");
+    Check(lines[0].Contains($"tipo={typeof(HttpRequestException).FullName}"), "Conservar el tipo técnico legible.");
+    Check(lines[0].Contains("check=comprobacion-ficticia]"), "Propagar correlación.");
+    Check(Regex.IsMatch(lines[0], @"\[session=[a-f0-9]{32} check=", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) &&
+        !AppLog.HasWriteFailure, "Identificar sesión sin fallos del logger.");
+    Check(lines[1].Contains(" INFO ") && lines[1].Contains("TrelloNotifier.Services.SettingsStore") &&
+        lines[1].Contains(" : Evento de prueba 0"), "Mostrar componente y mensaje de información sin JSON.");
+    return Task.CompletedTask;
+});
+
+await Run("Logs: modo diagnóstico y timeout como advertencia", () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    AppLog.Initialize(fixture.DirectoryPath, debug: true);
+    try
+    {
+        Log.Debug("Detalle de diagnóstico");
+        AppLog.WriteFailure("TestTimeout", new TaskCanceledException("URL_PRIVADA_FICTICIA"));
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    string[] lines = Directory.GetFiles(fixture.DirectoryPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
+    Check(lines.Length == 2, "Debug habilitado explícitamente.");
+    Check(lines[0].Contains(" DEBUG "), "Conservar detalle diagnóstico.");
+    Check(lines[1].Contains(" WARN "), "Timeout recuperable como advertencia.");
+    Check(!lines[1].Contains("URL_PRIVADA_FICTICIA"), "No filtrar datos en timeout.");
+    return Task.CompletedTask;
+});
+
+await Run("Logs: destino inaccesible no impide operar y permite recuperación", () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    string blockedPath = Path.Combine(fixture.DirectoryPath, "archivo");
+    File.WriteAllText(blockedPath, "bloqueo ficticio");
+    AppLog.Initialize(Path.Combine(blockedPath, "Logs"));
+    try
+    {
+        Check(AppLog.HasWriteFailure, "El fallo del destino queda observable.");
+        fixture.Store.Save(new AppSettings { ApiBaseUrl = "https://mock.invalid" });
+        Check(fixture.Store.Load().ApiBaseUrl == "https://mock.invalid", "Logging no interrumpe persistencia.");
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    AppLog.Initialize(Path.Combine(fixture.DirectoryPath, "Logs"));
+    try
+    {
+        Log.Information("Destino recuperado");
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    Check(!AppLog.HasWriteFailure, "Un destino válido permite recuperar el diagnóstico.");
+    return Task.CompletedTask;
+});
+
+await Run("Logs: monitor correlaciona fallo y recuperación sin datos de tarjetas", async () =>
+{
+    using var fixture = new Fixture();
+    string logsPath = Path.Combine(fixture.DirectoryPath, "Logs");
+    using var monitor = fixture.CreateMonitor();
+    AppLog.Initialize(logsPath);
+    try
+    {
+        fixture.Api.Fail = true;
+        await monitor.CheckNowAsync();
+        fixture.Api.Fail = false;
+        fixture.Api.Cards = new[] { Card("TARJETA_SECRETA_FICTICIA", DateTimeOffset.UtcNow.AddMinutes(10)) };
+        await monitor.CheckNowAsync();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        try
+        {
+            await monitor.CheckNowAsync(cancelled.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // La cancelación solicitada no produce un fallo de diagnóstico.
+        }
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    string[] lines = Directory.GetFiles(logsPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
+    int errorCount = 0;
+    var checks = new Dictionary<string, string>();
+    string? failedCheckId = null;
+    foreach (string line in lines)
+    {
+        Check(!line.Contains("TARJETA_SECRETA_FICTICIA") && !line.Contains("Fallo de conexión simulado"), "Excluir contenido privado del flujo real.");
+        Match correlation = Regex.Match(line, @" check=(?<id>[a-f0-9]{32})\]$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (line.Contains(" ERROR "))
+        {
+            errorCount++;
+            failedCheckId = correlation.Groups["id"].Value;
+        }
+        Match outcome = Regex.Match(line, @"Comprobación finalizada: (?<outcome>\w+);", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (outcome.Success)
+        {
+            Check(correlation.Success, "Conservar CheckId en la salida de texto.");
+            checks.Add(correlation.Groups["id"].Value, outcome.Groups["outcome"].Value);
+        }
+    }
+    Check(errorCount == 1 && checks.Count == 2, "Un registro por fallo, dos comprobaciones y ninguna falsa alarma por cancelación.");
+    Check(checks[failedCheckId!] == "Failed" && checks.Values.Contains("Succeeded"), "Correlación y recuperación observables.");
 });
 
 await Run("Arquitectura: modelos independientes de servicios, UI e IO", () =>

@@ -22,9 +22,19 @@ HTTP no exitoso produce `HttpRequestException`. El monitor publica errores en
 esperada no es un fallo de negocio. Persistencia informa errores mediante
 `IOException` y no reinicia datos ante fallos de SQLite o de importación JSON.
 No agregar catches vacíos generalizados ni cambiar esta política inadvertidamente.
-No hay framework de logging; `App.OnUnhandledException` escribe `crash.log`.
-No registrar URL autenticada, configuración ni payloads con información privada.
-La captura completa de excepciones actual es deuda documentada en `KNOWN_ISSUES.md`.
+Serilog escribe texto `.log` estilo Spring Boot mediante `AppLog`, con File y Async para rotación y
+cola limitada. Usar plantillas constantes y propiedades técnicas o conteos.
+Registrar errores una vez en la frontera que los captura (monitor, página o
+manejador global) con `AppLog.WriteFailure`, nunca pasando la excepción a Serilog
+ni copiando `Message`, `Data`, `ToString()` o excepciones internas. El helper
+conserva tipo, HResult y métodos sin rutas. Los servicios pueden registrar
+resultados, tiempos y conteos sin repetir el error. La inicialización de
+notificaciones registra el error que absorbe. La cancelación solicitada no se
+registra como fallo; los timeouts se registran como Warning.
+Usar `Log.ForContext<T>()` para identificar el componente. La plantilla muestra
+fecha, nivel, PID, aplicación, componente, mensaje y correlación. `WriteFailure`
+reduce CallerFilePath al nombre del componente, sin escribir la ruta de compilación.
+No registrar URLs, configuración ni payloads con información privada.
 
 ## Funciones, constantes, DTOs y mapeo
 Mantener funciones enfocadas y parámetros explícitos; las reglas temporales
