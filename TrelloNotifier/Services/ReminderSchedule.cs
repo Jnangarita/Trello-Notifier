@@ -21,6 +21,11 @@ internal static class ReminderSchedule
     public static bool ShouldNotify(TrelloCard card, AppSettings settings,
         IReadOnlyDictionary<string, DateTimeOffset> lastNotifications, DateTimeOffset now)
     {
+        if (!settings.NotificationsEnabled)
+        {
+            return false;
+        }
+
         if (!lastNotifications.TryGetValue(GetKey(card), out DateTimeOffset lastNotified))
         {
             return true;

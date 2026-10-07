@@ -406,7 +406,7 @@ await Run("Persistencia de preferencias y compatibilidad con configuración ante
     using var fixture = new Fixture(false);
     File.WriteAllText(Path.Combine(fixture.DirectoryPath, "settings.json"), "{\"PollIntervalMinutes\":7}");
     AppSettings settings = fixture.Store.Load();
-    Check(settings.PollIntervalMinutes == 7 && settings.RepeatReminderMinutes == 30 && !settings.IncludeOverdueCards,
+    Check(settings.PollIntervalMinutes == 7 && settings.RepeatReminderMinutes == 30 && !settings.IncludeOverdueCards && settings.NotificationsEnabled,
         "Importar preferencias y aplicar valores predeterminados a propiedades ausentes.");
     settings.RepeatReminderMinutes = 0;
     settings.IncludeOverdueCards = true;
@@ -449,6 +449,7 @@ await Run("SQLite conserva todas las preferencias sin crear archivos JSON", () =
         PollIntervalMinutes = 11,
         RepeatReminderMinutes = 60,
         IncludeOverdueCards = true,
+        NotificationsEnabled = false,
         PlaySound = false,
         Theme = "Dark"
     };
@@ -459,6 +460,48 @@ await Run("SQLite conserva todas las preferencias sin crear archivos JSON", () =
     Check(!File.Exists(Path.Combine(fixture.DirectoryPath, "settings.json")) &&
         !File.Exists(Path.Combine(fixture.DirectoryPath, "notified-cards.json")), "No crear JSON de persistencia.");
     return Task.CompletedTask;
+});
+
+await Run("Migración SQLite v1 conserva preferencias e historial y activa los avisos por defecto", async () =>
+{
+    using var fixture = new Fixture(false);
+    using (SqliteConnection connection = fixture.OpenDatabase())
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = @"
+            CREATE TABLE AppSettings (
+                Id INTEGER NOT NULL PRIMARY KEY CHECK (Id = 1),
+                ApiBaseUrl TEXT NOT NULL, ApiKey TEXT NOT NULL, Token TEXT NOT NULL,
+                NotifyBeforeMinutes INTEGER NOT NULL, PollIntervalMinutes INTEGER NOT NULL,
+                RepeatReminderMinutes INTEGER NOT NULL,
+                IncludeOverdueCards INTEGER NOT NULL CHECK (IncludeOverdueCards IN (0, 1)),
+                PlaySound INTEGER NOT NULL CHECK (PlaySound IN (0, 1)), Theme TEXT NOT NULL);
+            CREATE TABLE NotificationHistory (CardKey TEXT NOT NULL PRIMARY KEY, LastNotifiedAt TEXT NOT NULL);
+            INSERT INTO AppSettings VALUES (1, 'https://mock.example.com', 'dummy-key', 'dummy-token', 90, 7, 0, 1, 0, 'Dark');
+            INSERT INTO NotificationHistory VALUES ('anterior|123', $last);
+            PRAGMA user_version = 1;";
+        command.Parameters.AddWithValue("$last", now.ToString("O"));
+        command.ExecuteNonQuery();
+    }
+    File.WriteAllText(Path.Combine(fixture.DirectoryPath, "settings.json"), "Respaldo que no debe reimportarse");
+    AppSettings[] migrated = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+        new SettingsStore(fixture.DirectoryPath).Load())));
+    var expected = new AppSettings
+    {
+        ApiBaseUrl = "https://mock.example.com", ApiKey = "dummy-key", Token = "dummy-token",
+        NotifyBeforeMinutes = 90, PollIntervalMinutes = 7, RepeatReminderMinutes = 0,
+        IncludeOverdueCards = true, PlaySound = false, Theme = "Dark"
+    };
+    Check(migrated.All(settings => JsonSerializer.Serialize(settings) == JsonSerializer.Serialize(expected)),
+        "Migración concurrente conserva todos los campos y habilita las notificaciones.");
+    Check(fixture.Store.LoadNotifiedCards().Single().Value == now, "Conservar el historial sin reimportar JSON.");
+    expected.NotificationsEnabled = false;
+    fixture.Store.Save(expected);
+    Check(!new SettingsStore(fixture.DirectoryPath).Load().NotificationsEnabled, "Conservar desactivación al reabrir la base migrada.");
+    using SqliteConnection migratedConnection = fixture.OpenDatabase();
+    using SqliteCommand versionCommand = migratedConnection.CreateCommand();
+    versionCommand.CommandText = "PRAGMA user_version;";
+    Check(Convert.ToInt32(versionCommand.ExecuteScalar()) == 2, "Confirmar la nueva versión del esquema.");
 });
 
 await Run("Migración de ambos JSON conserva precisión y no vuelve a importar respaldos", () =>
@@ -574,7 +617,7 @@ await Run("Versión futura y base corrupta se conservan sin reinicialización", 
     using (SqliteConnection connection = fixture.OpenDatabase())
     {
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version = 2;";
+        command.CommandText = "PRAGMA user_version = 3;";
         command.ExecuteNonQuery();
     }
     ExpectStorageFailure(() => fixture.Store.Save(new AppSettings()));
@@ -632,6 +675,65 @@ await Run("Monitor agrupa avisos y evita duplicados concurrentes y tras reinicia
     fixture.Store.SaveNotifiedCards(history);
     await restarted.CheckNowAsync();
     Check(fixture.Notifications.Batches.Count == 2 && fixture.Notifications.Batches[1].Single().Id == "uno", "Repetir solo la tarjeta cuyo intervalo transcurrió.");
+});
+
+await Run("Desactivar avisos mantiene las tarjetas y el historial y permite reanudarlos", async () =>
+{
+    foreach (int repeatMinutes in new[] { 0, 30 })
+    {
+        using var fixture = new Fixture();
+        AppSettings settings = fixture.Store.Load();
+        settings.NotificationsEnabled = false;
+        settings.IncludeOverdueCards = true;
+        settings.RepeatReminderMinutes = repeatMinutes;
+        fixture.Store.Save(settings);
+        DateTimeOffset checkTime = DateTimeOffset.UtcNow;
+        TrelloCard previous = Card("avisada", checkTime.AddMinutes(40));
+        fixture.Api.Cards = new[] { previous, Card("nueva", checkTime.AddMinutes(50)), Card("vencida", checkTime.AddDays(-1)) };
+        string previousKey = ReminderSchedule.GetKey(previous);
+        DateTimeOffset lastNotified = checkTime.AddHours(-3);
+        fixture.Store.SaveNotifiedCards(new() { [previousKey] = lastNotified });
+        using var monitor = fixture.CreateMonitor();
+        MonitorSnapshot? snapshot = null;
+        monitor.Updated += value => snapshot = value;
+        await Task.WhenAll(monitor.CheckNowAsync(), monitor.CheckNowAsync());
+        Check(fixture.Notifications.Batches.Count == 0, "Omitir primeros avisos, repeticiones y resúmenes con la opción desactivada.");
+        Check(snapshot is { IsRunning: true, HasError: false, AssignedCards.Count: 3, DueSoonCards.Count: 3 },
+            "Seguir consultando y publicando las tarjetas sin avisos.");
+        Check(snapshot!.Message.Contains("Notificaciones de escritorio desactivadas", StringComparison.Ordinal), "Informar la pausa de avisos.");
+        var history = fixture.Store.LoadNotifiedCards();
+        Check(history.Count == 1 && history[previousKey] == lastNotified, "No registrar avisos omitidos ni alterar su última fecha.");
+
+        using var restarted = fixture.CreateMonitor();
+        await restarted.CheckNowAsync();
+        Check(fixture.Notifications.Batches.Count == 0, "Reiniciar mantiene los avisos desactivados.");
+        settings.NotificationsEnabled = true;
+        fixture.Store.Save(settings);
+        await restarted.CheckNowAsync();
+        Check(fixture.Notifications.Batches.Single().Count == (repeatMinutes == 0 ? 2 : 3),
+            "Reanudar avisos elegibles respetando Nunca y el historial anterior.");
+        await restarted.CheckNowAsync();
+        Check(fixture.Notifications.Batches.Count == 1, "Reactivar no produce duplicados en la siguiente comprobación.");
+    }
+});
+
+await Run("Desactivar durante una consulta en curso impide enviar el aviso al recibir la respuesta", async () =>
+{
+    using var fixture = new Fixture();
+    fixture.Api.Cards = new[] { Card("en-curso", DateTimeOffset.UtcNow.AddMinutes(50)) };
+    fixture.Api.BeforeResponse = () =>
+    {
+        AppSettings settings = fixture.Store.Load();
+        settings.NotificationsEnabled = false;
+        fixture.Store.Save(settings);
+    };
+    using var monitor = fixture.CreateMonitor();
+    MonitorSnapshot? snapshot = null;
+    monitor.Updated += value => snapshot = value;
+    await monitor.CheckNowAsync();
+    Check(snapshot is { HasError: false, AssignedCards.Count: 1 }, "Completar la consulta en curso.");
+    Check(fixture.Notifications.Batches.Count == 0 && fixture.Store.LoadNotifiedCards().Count == 0,
+        "Respetar la preferencia recién guardada sin consumir el primer aviso.");
 });
 
 await Run("Un aviso rechazado no consume el intervalo de repetición", async () =>

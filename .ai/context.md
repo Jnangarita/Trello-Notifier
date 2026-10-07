@@ -36,7 +36,9 @@ de historial. `TrelloApiClient` usa `HttpClient` con timeout de 30 segundos.
 `SettingsStore` guarda configuración e historial en `trello-notifier.db` en el
 perfil local mediante Microsoft.Data.Sqlite 10.0.12. La primera apertura importa
 ambos JSON anteriores en una transacción y conserva los originales como respaldo;
-`user_version = 1` impide reimportarlos. Los fallos no reinician datos. Las páginas
+`user_version` impide reimportarlos. El esquema 2 añade `NotificationsEnabled`
+(activado por defecto) y migra el esquema 1 conservando los datos. Al desactivarlo,
+el monitor sigue consultando tarjetas sin enviar ni registrar avisos. Los fallos no reinician datos. Las páginas
 y el monitor ejecutan el IO SQLite síncrono fuera del hilo UI. `DesktopNotificationService`
 encapsula las notificaciones de Windows y usa `App.GetAssetPath` para el icono.
 

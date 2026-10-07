@@ -39,6 +39,7 @@ public sealed partial class SettingsPage : Page
             .FirstOrDefault(item => item.Tag?.ToString() == settings.RepeatReminderMinutes.ToString())
             ?? RepeatReminderComboBox.Items[2];
         IncludeOverdueCheckBox.IsChecked = settings.IncludeOverdueCards;
+        NotificationsToggleSwitch.IsOn = settings.NotificationsEnabled;
         SoundCheckBox.IsChecked = settings.PlaySound;
 
         ThemeComboBox.SelectedItem = ThemeComboBox.Items
@@ -134,6 +135,7 @@ public sealed partial class SettingsPage : Page
                 ? 0
                 : (int)PollIntervalNumberBox.Value,
             PlaySound = SoundCheckBox.IsChecked == true,
+            NotificationsEnabled = NotificationsToggleSwitch.IsOn,
             RepeatReminderMinutes = int.TryParse(
                 (RepeatReminderComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out int repeatMinutes)
                 ? repeatMinutes : 30,

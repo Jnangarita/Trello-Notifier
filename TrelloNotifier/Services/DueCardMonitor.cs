@@ -150,6 +150,10 @@ internal sealed class DueCardMonitor : IDisposable
             }
             bool notificationStateChanged = obsoleteKeys.Count > 0;
 
+            // La preferencia puede cambiar mientras una consulta manual espera a la API.
+            operation = "LoadNotificationSettings";
+            settings.NotificationsEnabled = _settingsStore.Load().NotificationsEnabled;
+            cancellationToken.ThrowIfCancellationRequested();
             List<TrelloCard> reminders = eligibleCards
                 .Where(card => ReminderSchedule.ShouldNotify(card, settings, notifiedCards, now))
                 .ToList();
@@ -170,7 +174,9 @@ internal sealed class DueCardMonitor : IDisposable
             }
 
             int overdueCount = eligibleCards.Count(card => card.Due <= now);
-            string reminderMessage = eligibleCards.Count == 0
+            string reminderMessage = !settings.NotificationsEnabled
+                ? "Notificaciones de escritorio desactivadas."
+                : eligibleCards.Count == 0
                 ? "No hay tarjetas para avisar."
                 : $"Para avisos: {eligibleCards.Count - overdueCount} tarjeta(s) próxima(s) a vencer" +
                   $" y {overdueCount} vencida(s) pendiente(s).";

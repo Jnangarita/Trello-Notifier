@@ -9,6 +9,7 @@ public sealed class AppSettings
     public int PollIntervalMinutes { get; set; } = 5;
     public int RepeatReminderMinutes { get; set; } = 30;
     public bool IncludeOverdueCards { get; set; }
+    public bool NotificationsEnabled { get; set; } = true;
     public bool PlaySound { get; set; } = true;
     public string Theme { get; set; } = "Default";
 

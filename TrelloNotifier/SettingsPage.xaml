@@ -67,6 +67,10 @@
                             <TextBlock Text="Define la anticipación y la frecuencia de tus avisos." Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
                     </Grid>
+                    <ToggleSwitch x:Name="NotificationsToggleSwitch" Header="Notificaciones de escritorio"
+                                  OnContent="Activadas" OffContent="Desactivadas" IsOn="True" />
+                    <TextBlock Text="Guarda los cambios para aplicar esta opción. Al desactivarla, las tarjetas siguen actualizándose sin mostrar avisos en el escritorio."
+                               Style="{StaticResource CaptionTextStyle}" />
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="12">
                         <NumberBox x:Name="NotifyBeforeNumberBox" Header="Anticipación (minutos)" Minimum="1" Maximum="10080"
                                    MinHeight="40" SpinButtonPlacementMode="Compact" />
@@ -86,7 +90,8 @@
                             <CheckBox x:Name="IncludeOverdueCheckBox" Content="Incluir tarjetas vencidas pendientes" />
                             <TextBlock Text="Las vencidas se recuerdan cada 2 horas desde su último aviso. Nunca desactiva también estas repeticiones. Si hay varias tarjetas para avisar, se muestra un resumen."
                                        Style="{StaticResource CaptionTextStyle}" />
-                            <CheckBox x:Name="SoundCheckBox" Content="Reproducir sonido en las notificaciones" />
+                            <CheckBox x:Name="SoundCheckBox" Content="Reproducir sonido en las notificaciones"
+                                      IsEnabled="{x:Bind NotificationsToggleSwitch.IsOn, Mode=OneWay}" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -117,7 +122,8 @@
             <StackPanel x:Name="SettingsActions" Orientation="Horizontal" Spacing="12">
                 <Button Content="Guardar cambios" Style="{StaticResource PrimaryActionButtonStyle}" Click="Save_Click" />
                 <Button Content="Probar conexión" Style="{StaticResource ActionButtonStyle}" Click="TestConnection_Click" />
-                <Button Content="Probar notificación" Style="{StaticResource ActionButtonStyle}" Click="TestNotification_Click" />
+                <Button Content="Probar notificación" Style="{StaticResource ActionButtonStyle}" Click="TestNotification_Click"
+                        IsEnabled="{x:Bind NotificationsToggleSwitch.IsOn, Mode=OneWay}" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

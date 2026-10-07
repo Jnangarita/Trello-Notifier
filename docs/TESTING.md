@@ -27,6 +27,9 @@ Los ámbitos pendiente/historial cubren completadas y archivadas independientes,
 su unión sin duplicados, filtros combinados, tableros, listas vacías, restauración
 y compatibilidad de `closed` ausente. Se comprueba que las archivadas no generan
 avisos y se retiran del historial de repetición aunque un mock las devuelva como abiertas.
+El interruptor de notificaciones cubre persistencia, migración concurrente de SQLite
+v1 a v2 sin pérdida de datos, pausa de primeros avisos y repeticiones, tarjetas
+consultables, reactivación respetando el historial y desactivación durante una consulta.
 
 `Fixture` crea una carpeta temporal única y la elimina con `Dispose`.
 `MonitorDoubles.cs` aporta los mismos nombres/tipos que los servicios externos
@@ -92,6 +95,12 @@ Abrir en Windows, navegar dashboard/configuración, guardar y comprobar temas,
 usar **Probar notificación** sin red. Para integración HTTP usar un mock con
 valores ficticios siguiendo el README; comprobar refresco y errores. Revisar
 suscripciones, activación de enlaces y duplicación de recordatorios si se tocaron.
+En **Configuración → Monitor**, desactivar **Notificaciones de escritorio**, guardar
+y comprobar que **Comprobar ahora** actualiza las tarjetas sin emitir avisos y muestra
+el estado desactivado. Verificar que sonido y **Probar notificación** se deshabilitan
+al apagar el interruptor; reactivarlo, guardar y comprobar la reanudación según el
+historial. Reiniciar para confirmar que la preferencia se conserva. Comprobar el
+interruptor con teclado y en los temas claro, oscuro y de contraste.
 En **Mis tarjetas**, comprobar los cinco filtros, recuentos, estado vacío y error;
 incluir tarjetas sin fecha y verificar que completadas y archivadas quedan fuera.
 Desactivar avisos de vencidas debe

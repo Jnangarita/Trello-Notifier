@@ -188,6 +188,19 @@ también listas archivadas.
 
 Por defecto, la aplicación consulta Trello cada **5 minutos**, avisa sobre tarjetas que vencen durante los próximos **60 minutos** y repite sus recordatorios cada **30 minutos** mientras sigan dentro del periodo de aviso.
 
+### Activar o desactivar las notificaciones de escritorio
+
+En **Configuración → Monitor**, cambia **Notificaciones de escritorio** y pulsa
+**Guardar cambios**. La opción está activada por defecto y se conserva al reiniciar.
+Al desactivarla, el monitor sigue actualizando **Mis tarjetas**, pero no envía avisos
+de vencimientos, repeticiones ni resúmenes, incluso al pulsar **Comprobar ahora**.
+El estado del monitor indica que las notificaciones están desactivadas.
+
+Los avisos omitidos no se registran como enviados. Al reactivar la opción se evalúan
+las tarjetas actuales respetando la anticipación, la repetición y el historial previo.
+El control de sonido y **Probar notificación** se deshabilitan mientras el interruptor
+está desactivado. Los avisos ya enviados a Windows no se retiran.
+
 ### Configurar la frecuencia de los recordatorios
 
 La consulta y los filtros de **Mis tarjetas** son independientes de qué tarjetas generan avisos.
@@ -356,6 +369,10 @@ La base se crea al acceder por primera vez a las preferencias o al historial:
 - `AppSettings` guarda la conexión, los intervalos, las opciones de avisos, el sonido y el tema en columnas.
 - `NotificationHistory` guarda la clave de tarjeta y vencimiento y la fecha del último aviso, conservando su precisión y zona horaria original (offset).
 - `PRAGMA user_version` identifica la versión del esquema. Una versión desconocida se rechaza sin sobrescribirla.
+
+El esquema 2 añade la preferencia de notificaciones de escritorio. Las bases del
+esquema 1 se actualizan automáticamente en una transacción, con los avisos activados
+por defecto y conservando las demás preferencias y el historial.
 
 Si existen `settings.json` o `notified-cards.json`, se importan juntos en una transacción. También se admite el historial antiguo de claves sin fechas: recibe una única hora de migración para evitar avisos duplicados inmediatos. Los campos de configuración ausentes conservan los valores predeterminados.
 
