@@ -274,6 +274,22 @@ con las tarjetas sin fecha al final.
 Cambiar los filtros utiliza la última consulta y recalcula el estado según la hora actual, sin hacer solicitudes de red ni enviar avisos. Los filtros se mantienen durante las comprobaciones de esa pantalla; si el tablero seleccionado deja de tener tarjetas, se vuelve a **Todos los tableros**. Al volver a abrir la pantalla comienza en **Todas las pendientes** y **Todos los tableros**.
 **Comprobar ahora** actualiza los datos desde Trello y ejecuta la comprobación habitual de recordatorios. También se actualizan automáticamente con el intervalo configurado.
 
+### Paginación de las tablas
+
+**Mis tarjetas** e **Historial** muestran **25 filas por página** de forma predeterminada.
+En el pie de la tabla, selecciona **10, 25 o 50** en el selector de cantidad y utiliza
+las flechas **Página anterior** y **Página siguiente**. A su izquierda se indica
+el rango visible y el total filtrado, por ejemplo, **26–50 de 63**.
+
+La paginación se aplica después de la búsqueda y los filtros, utilizando las tarjetas
+ya descargadas. Cambiar de página no consulta Trello ni envía notificaciones. Los
+indicadores siguen resumiendo todas las tarjetas pendientes de la consulta.
+Cambiar la búsqueda, un filtro o el tamaño de página vuelve a la primera página.
+Al actualizar se conserva la página actual; si desaparece por una reducción de
+resultados, se muestra la última disponible. Ante un error, los botones de navegación
+se deshabilitan y la página seleccionada se conserva para la siguiente consulta correcta.
+Al volver a abrir la pantalla se comienza en la primera página con 25 filas.
+
 ### Consultar el historial de tarjetas
 
 Abre **Historial** para consultar las tarjetas completadas o archivadas que siguen

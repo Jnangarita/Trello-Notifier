@@ -23,6 +23,8 @@ instancias compartidas de servicios concretos. `App` inicia el monitor y gestion
 activación/cierre. `MainPage` proporciona navegación, tema e InfoBar.
 `DashboardPage` muestra pendientes no archivadas del snapshot y reutiliza su UI
 para Historial (completadas o archivadas, consulta bajo demanda sin avisos);
+ambas vistas usan paginación local de 10/25/50 filas (25 por defecto), posterior a
+los filtros mediante `MonitorSnapshot.GetCardPage`, sin nuevas consultas ni avisos.
 `SettingsPage` valida y guarda preferencias.
 `Styles.xaml` contiene los estilos compartidos.
 

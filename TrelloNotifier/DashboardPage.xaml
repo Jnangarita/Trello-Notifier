@@ -50,6 +50,11 @@
                         <Setter Target="FilterOptions.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="FilterOptions.Margin" Value="0,12,0,0" />
                         <Setter Target="TableHeadings.Visibility" Value="Collapsed" />
+                        <Setter Target="PageNavigation.(Grid.Row)" Value="1" />
+                        <Setter Target="PageNavigation.(Grid.Column)" Value="0" />
+                        <Setter Target="PageNavigation.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="PageNavigation.HorizontalAlignment" Value="Left" />
+                        <Setter Target="PageNavigation.Margin" Value="0,12,0,0" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="WideFilters">
@@ -169,7 +174,7 @@
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource PanelStyle}" Padding="0">
-                <Grid RowDefinitions="Auto,*">
+                <Grid RowDefinitions="Auto,*,Auto">
                     <Border x:Name="TableHeadings" Background="{ThemeResource AppControlBackgroundBrush}"
                             BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="20,9">
                         <Grid ColumnDefinitions="2.2*,1.35*,1.35*,1.45*,120,150" ColumnSpacing="16">
@@ -319,6 +324,36 @@
                             </ListView.ItemTemplate>
                         </ListView>
                     </Grid>
+                    <Border Grid.Row="2" BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <ComboBox x:Name="PageSizeComboBox" SelectedIndex="1" MinWidth="80"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                      Style="{StaticResource InputComboBoxStyle}" AutomationProperties.Name="Filas por página"
+                                      SelectionChanged="PageSize_SelectionChanged">
+                                <ComboBoxItem Content="10" Tag="10" />
+                                <ComboBoxItem Content="25" Tag="25" />
+                                <ComboBoxItem Content="50" Tag="50" />
+                            </ComboBox>
+                            <StackPanel x:Name="PageNavigation" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0">
+                                <StackPanel.Resources>
+                                    <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+                                </StackPanel.Resources>
+                                <TextBlock x:Name="PageRangeText" Text="0–0 de 0" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Style="{StaticResource CaptionTextStyle}" AutomationProperties.LiveSetting="Polite" />
+                                <Button x:Name="PreviousPageButton" IsEnabled="False"
+                                        Style="{StaticResource PaginationButtonStyle}" AutomationProperties.Name="Página anterior"
+                                        ToolTipService.ToolTip="Página anterior" Click="PreviousPage_Click">
+                                    <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                                </Button>
+                                <Button x:Name="NextPageButton" IsEnabled="False"
+                                        Style="{StaticResource PaginationButtonStyle}" AutomationProperties.Name="Página siguiente"
+                                        ToolTipService.ToolTip="Página siguiente" Click="NextPage_Click">
+                                    <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
             </Grid>

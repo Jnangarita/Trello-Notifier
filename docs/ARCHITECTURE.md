@@ -28,6 +28,9 @@ y la anticipación usada. `TrelloCard.GetStatus` centraliza los estados temporal
 para el calendario y los filtros; no depende de la preferencia de avisar vencidas.
 `MonitorSnapshot` obtiene las opciones de tablero y filtra sus tarjetas por
 ámbito (`TrelloCardScope`), tablero, estado y búsqueda, reutilizando `GetStatus`.
+`GetCardPage` reutiliza ese filtrado y orden para devolver una página local, el
+total filtrado y los límites de navegación. `DashboardPage` conserva la selección
+de página y tamaño para ambas vistas y solo crea los viewmodels de las filas visibles.
 Mis tarjetas usa el ámbito pendiente (sin completar ni archivar), también para
 sus indicadores. `DashboardPage` se reutiliza mediante un parámetro de navegación
 para Historial: consulta todas las asignadas al entrar o actualizar, muestra la

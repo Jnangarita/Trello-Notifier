@@ -30,6 +30,9 @@ avisos y se retiran del historial de repetición aunque un mock las devuelva com
 El interruptor de notificaciones cubre persistencia, migración concurrente de SQLite
 v1 a v2 sin pérdida de datos, pausa de primeros avisos y repeticiones, tarjetas
 consultables, reactivación respetando el historial y desactivación durante una consulta.
+La paginación cubre tamaños de 10/25/50, límites y páginas parciales o vacías,
+recorrido sin omisiones ni duplicados, desempate estable por ID, filtros combinados
+en pendientes e historial y ajuste de la última página al reducirse los resultados.
 
 `Fixture` crea una carpeta temporal única y la elimina con `Dispose`.
 `MonitorDoubles.cs` aporta los mismos nombres/tipos que los servicios externos
@@ -121,6 +124,19 @@ guiones en los indicadores. Comprobar el orden por vencimiento y después por
 nombre, con las tarjetas sin fecha al final, también al filtrar y refrescar.
 Verificar colores e iconos de estado al filtrar y desplazar la lista (filas recicladas).
 El pipeline no demuestra que Windows haya mostrado un toast correctamente.
+
+En ambas tablas, usar más de 50 tarjetas del mock y recorrer las flechas **Página anterior/Página siguiente**:
+comprobar rango y total filtrado (por ejemplo, **26–50 de 63**), última página parcial,
+**0–0 de 0** sin resultados y flechas deshabilitadas en los extremos. Revisar el texto
+a la izquierda de las flechas, los tooltips y los estados de foco, hover y deshabilitado.
+Alternar **10/25/50 filas por página**, búsqueda, tablero y estado desde una página
+intermedia: deben volver a la primera página y mantener los demás filtros. Los
+indicadores globales no deben cambiar al paginar. Verificar que los enlaces de las
+filas siguen abriendo la tarjeta correcta y que cada página comienza arriba.
+Actualizar debe conservar la página actual o ajustarla a la última disponible si
+se eliminan tarjetas. Comprobar resultados vacíos, error con botones deshabilitados
+y recuperación en la página previa. Paginar no debe generar solicitudes HTTP ni
+avisos. Revisar el pie de tabla en diseño compacto y amplio, temas y navegación por teclado.
 
 En **Historial**, comprobar Todas, Completadas y Archivadas con tarjetas que tengan
 ambos estados y archivadas sin completar; estas últimas no deben parecer completadas

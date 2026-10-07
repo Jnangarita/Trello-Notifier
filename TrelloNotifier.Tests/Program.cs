@@ -245,6 +245,119 @@ await Run("Filtro por tablero combinado con todos los estados", () =>
     return Task.CompletedTask;
 });
 
+await Run("Paginación recorre todas las tarjetas sin omisiones ni duplicados y con orden estable", () =>
+{
+    foreach (int pageSize in new[] { 10, 25, 50 })
+    {
+        foreach (int total in new[] { 0, 1, 10, 25, 26, 50, 51 })
+        {
+            TrelloCard[] cards = Enumerable.Range(1, total).Select(index =>
+            {
+                TrelloCard card = Card($"tarjeta-{index:D3}", now.AddMinutes(30));
+                card.Name = "Mismo nombre";
+                return card;
+            }).ToArray();
+            var snapshot = new MonitorSnapshot(true, "", now, Array.Empty<TrelloCard>())
+            {
+                AssignedCards = cards.Reverse().ToArray()
+            };
+            var first = snapshot.GetCardPage(1, pageSize, null, null, now);
+            Check(first.TotalCount == total && first.PageCount == (int)Math.Ceiling((double)total / pageSize),
+                "Contar páginas completas, parciales y resultados vacíos.");
+            var visited = new List<string>();
+            for (int number = 1; number <= first.PageCount; number++)
+            {
+                var page = snapshot.GetCardPage(number, pageSize, null, null, now);
+                Check(page.PageNumber == number && page.Cards.Count > 0 && page.Cards.Count <= pageSize,
+                    "Cada página válida contiene como máximo el tamaño solicitado.");
+                visited.AddRange(page.Cards.Select(card => card.Id));
+            }
+            Check(visited.SequenceEqual(cards.Select(card => card.Id)),
+                "El desempate por ID permite recorrer todos los resultados aunque coincidan fecha y nombre.");
+            Check(snapshot.GetCardPage(int.MinValue, pageSize, null, null, now).PageNumber == 1,
+                "Ajustar páginas inferiores al inicio.");
+            var last = snapshot.GetCardPage(int.MaxValue, pageSize, null, null, now);
+            Check(last.PageNumber == Math.Max(1, first.PageCount), "Ajustar páginas superiores al final sin desbordar.");
+            Check(total != 0 || last.Cards.Count == 0, "La página vacía no contiene tarjetas.");
+        }
+    }
+    return Task.CompletedTask;
+});
+
+await Run("Paginación aplica primero tablero, búsqueda, estado y ámbitos de pendientes e historial", () =>
+{
+    var cards = new List<TrelloCard>();
+    for (int index = 1; index <= 30; index++)
+    {
+        foreach (string kind in new[] { "pendiente", "completada", "archivada", "ambas" })
+        {
+            TrelloCard card = Card($"{kind}-{index:D2}", now.AddMinutes(index), kind is "completada" or "ambas");
+            card.Closed = kind is "archivada" or "ambas";
+            card.BoardId = index % 2 == 0 ? "a" : "b";
+            card.Name = index % 3 == 0 ? $"Entrega {index:D2}" : $"Reunión {index:D2}";
+            cards.Add(card);
+        }
+    }
+    var snapshot = new MonitorSnapshot(true, "", now, new[] { cards[0] })
+    {
+        AssignedCards = cards,
+        NotifyBeforeMinutes = 60
+    };
+    foreach (var item in new[]
+    {
+        (Scope: TrelloCardScope.Pending, Count: 5),
+        (Scope: TrelloCardScope.History, Count: 15),
+        (Scope: TrelloCardScope.Completed, Count: 10),
+        (Scope: TrelloCardScope.Archived, Count: 10)
+    })
+    {
+        var page = snapshot.GetCardPage(2, 2, "a", null, now, "  ENTREGA  ", item.Scope);
+        Check(page.TotalCount == item.Count && page.PageNumber == 2 && page.Cards.Count == 2,
+            "El total corresponde a los filtros y al ámbito, antes de paginar.");
+        Check(page.Cards.SequenceEqual(snapshot.GetFilteredCards("a", null, now, "entrega", item.Scope).Skip(2).Take(2)),
+            "Conservar los filtros y el orden de vencimiento en las páginas intermedias.");
+    }
+    var pending = snapshot.GetCardPage(2, 2, "a", TrelloCardStatus.DueSoon, now, "entrega", TrelloCardScope.Pending);
+    Check(pending.Cards.Select(card => card.Id).SequenceEqual(new[] { "pendiente-18", "pendiente-24" }),
+        "Combinar todos los filtros sin reincorporar tarjetas históricas.");
+    var noMatches = snapshot.GetCardPage(3, 10, "a", TrelloCardStatus.NoDueDate, now, "entrega", TrelloCardScope.Pending);
+    Check(noMatches is { TotalCount: 0, PageCount: 0, PageNumber: 1 } && noMatches.Cards.Count == 0,
+        "Una combinación sin coincidencias vuelve a la página inicial vacía.");
+    Check(snapshot.AssignedCards.Count == 120 && snapshot.DueSoonCards.Single() == cards[0],
+        "Paginar no reduce los datos de indicadores ni las candidatas a notificación.");
+    return Task.CompletedTask;
+});
+
+await Run("Paginación conserva o ajusta la página al actualizar y rechaza tamaños inválidos", () =>
+{
+    TrelloCard[] cards = Enumerable.Range(1, 60).Select(index => Card($"tarjeta-{index:D2}", index <= 50 ? now.AddMinutes(index) : null)).ToArray();
+    var snapshot = new MonitorSnapshot(true, "", now, Array.Empty<TrelloCard>()) { AssignedCards = cards };
+    var last = snapshot.GetCardPage(3, 25, null, null, now);
+    Check(last.PageNumber == 3 && last.Cards.Count == 10 && last.Cards.All(card => card.Due is null),
+        "Conservar página y colocar las tarjetas sin fecha al final.");
+    var reduced = snapshot with { AssignedCards = cards.Take(27).ToArray() };
+    var adjusted = reduced.GetCardPage(last.PageNumber, 25, null, null, now);
+    Check(adjusted is { PageNumber: 2, PageCount: 2, TotalCount: 27 } && adjusted.Cards.Count == 2,
+        "Si la página desaparece al actualizar, mostrar la última disponible.");
+    var empty = snapshot with { AssignedCards = Array.Empty<TrelloCard>() };
+    Check(empty.GetCardPage(last.PageNumber, 25, null, null, now) is { PageNumber: 1, PageCount: 0, TotalCount: 0 },
+        "Una actualización vacía limpia la paginación.");
+    foreach (int invalidSize in new[] { 0, -1 })
+    {
+        bool rejected = false;
+        try
+        {
+            snapshot.GetCardPage(1, invalidSize, null, null, now);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            rejected = true;
+        }
+        Check(rejected, "Rechazar tamaños que impidan calcular páginas válidas.");
+    }
+    return Task.CompletedTask;
+});
+
 await Run("Opciones de tablero únicas, nombres ausentes y cambios de consulta", () =>
 {
     TrelloCard first = Card("primera", null);

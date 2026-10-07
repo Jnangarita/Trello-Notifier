@@ -17,6 +17,8 @@ public sealed partial class DashboardPage : Page
     private bool _updatingBoardFilter;
     private CancellationTokenSource? _pageCancellation;
     private bool _refreshing;
+    private int _pageNumber = 1;
+    private int _pageSize = 25;
 
     internal TrelloCardScope Scope { get; private set; } = TrelloCardScope.Pending;
 
@@ -171,16 +173,45 @@ public sealed partial class DashboardPage : Page
 
     private void StatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        _pageNumber = 1;
         ApplyFilter();
     }
 
     private void BoardFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_updatingBoardFilter) ApplyFilter();
+        if (!_updatingBoardFilter)
+        {
+            _pageNumber = 1;
+            ApplyFilter();
+        }
     }
 
     private void CardSearch_TextChanged(object sender, TextChangedEventArgs e)
     {
+        _pageNumber = 1;
+        ApplyFilter();
+    }
+
+    private void PageSize_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: ComboBoxItem item } &&
+            int.TryParse(item.Tag?.ToString(), out int pageSize) && pageSize > 0)
+        {
+            _pageSize = pageSize;
+            _pageNumber = 1;
+            ApplyFilter();
+        }
+    }
+
+    private void PreviousPage_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pageNumber > 1) _pageNumber--;
+        ApplyFilter();
+    }
+
+    private void NextPage_Click(object sender, RoutedEventArgs e)
+    {
+        _pageNumber++;
         ApplyFilter();
     }
 
@@ -229,16 +260,27 @@ public sealed partial class DashboardPage : Page
         TrelloCardScope selectedScope = Scope == TrelloCardScope.History && Enum.TryParse(tag, out TrelloCardScope historyScope)
             ? historyScope : Scope;
         DateTimeOffset now = DateTimeOffset.Now;
-        IEnumerable<TrelloCard> cards = _snapshot.GetFilteredCards(
+        var page = _snapshot.GetCardPage(_pageNumber, _pageSize,
             BoardFilter.SelectedValue as string, filtered ? status : null, now, CardSearch.Text, selectedScope);
 
+        bool available = _snapshot.IsRunning && !_snapshot.HasError;
         _cards.Clear();
-        foreach (TrelloCard card in cards)
+        if (available)
         {
-            _cards.Add(new TrelloCardViewModel(card, now, _snapshot.NotifyBeforeMinutes));
+            _pageNumber = page.PageNumber;
+            foreach (TrelloCard card in page.Cards)
+            {
+                _cards.Add(new TrelloCardViewModel(card, now, _snapshot.NotifyBeforeMinutes));
+            }
+            if (_cards.Count > 0) CardsList.ScrollIntoView(_cards[0]);
         }
 
-        bool available = _snapshot.IsRunning && !_snapshot.HasError;
+        PreviousPageButton.IsEnabled = available && _pageNumber > 1;
+        NextPageButton.IsEnabled = available && _pageNumber < page.PageCount;
+        PageRangeText.Text = !available ? "— de —"
+            : page.TotalCount == 0 ? "0–0 de 0"
+            : $"{(_pageNumber - 1) * _pageSize + 1}–{(_pageNumber - 1) * _pageSize + _cards.Count} de {page.TotalCount}";
+
         List<TrelloCard> scopedCards = _snapshot.GetCards(Scope).ToList();
         var counts = scopedCards.GroupBy(card => card.GetStatus(now, _snapshot.NotifyBeforeMinutes))
             .ToDictionary(group => group.Key, group => group.Count());

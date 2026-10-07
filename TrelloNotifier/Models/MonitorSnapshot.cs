@@ -42,6 +42,21 @@ public sealed record MonitorSnapshot(
                 (status is null || card.GetStatus(now, NotifyBeforeMinutes) == status) &&
                 (search.Length == 0 || card.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))
             .OrderBy(card => card.Due ?? DateTimeOffset.MaxValue)
-            .ThenBy(card => card.Name);
+            .ThenBy(card => card.Name)
+            .ThenBy(card => card.Id, StringComparer.Ordinal);
+    }
+
+    public (IReadOnlyList<TrelloCard> Cards, int TotalCount, int PageNumber, int PageCount) GetCardPage(
+        int pageNumber, int pageSize, string? boardId, TrelloCardStatus? status, DateTimeOffset now,
+        string? searchText = null, TrelloCardScope scope = TrelloCardScope.All)
+    {
+        if (pageSize < 1) throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+        List<TrelloCard> filteredCards = GetFilteredCards(boardId, status, now, searchText, scope).ToList();
+        int totalCount = filteredCards.Count;
+        int pageCount = totalCount == 0 ? 0 : (totalCount - 1) / pageSize + 1;
+        int currentPage = Math.Clamp(pageNumber, 1, Math.Max(1, pageCount));
+        List<TrelloCard> page = filteredCards.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+        return (page, totalCount, currentPage, pageCount);
     }
 }
