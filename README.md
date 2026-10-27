@@ -66,7 +66,7 @@ El parámetro `scope=read` solicita el permiso de lectura que necesita la aplica
 
    | Campo | Valor |
    | --- | --- |
-   | **URL base de la API** | `https://api.trello.com` |
+   | **URL base de la API** | `https://api.trello.com` (solo lectura). |
    | **API key** | La clave copiada de **Trello Auth**. |
    | **Token** | El token obtenido al autorizar el acceso de lectura. |
 
@@ -165,11 +165,11 @@ Esta prueba no realiza solicitudes de red y no necesita API key ni token.
 
 4. Ajusta `due` a una fecha futura que esté dentro de la anticipación configurada. Por ejemplo, dentro de los próximos 60 minutos.
 5. Crea el Mock Server y copia su URL, con un formato similar a `https://abc123.mock.pstmn.io`.
-6. En Trello Notifier, reemplaza **URL base de la API** por esa URL. No agregues `/1/members/me/cards` al final.
+6. Para usar el mock, la configuración persistida debe tener previamente esa URL en `ApiBaseUrl`; este valor es de solo lectura en la interfaz. No agregues `/1/members/me/cards` al final.
 7. Deja vacíos **API key** y **Token**, pulsa **Probar conexión** y después **Guardar cambios**.
 8. Regresa a **Mis tarjetas** y pulsa **Comprobar ahora**.
 
-La aplicación añadirá automáticamente la ruta `/1/members/me/cards` y los parámetros de consulta. Para volver al servicio real, restaura la URL `https://api.trello.com` e introduce las credenciales de Trello.
+La aplicación añadirá automáticamente la ruta `/1/members/me/cards` y los parámetros de consulta. Para volver al servicio real, restaura la URL `https://api.trello.com` en la configuración persistida e introduce las credenciales de Trello en la interfaz.
 
 Para probar el filtro por tablero, añade `"idBoard": "tablero-prueba"` a las
 tarjetas del ejemplo y agrega al mock una respuesta `200` para

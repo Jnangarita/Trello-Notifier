@@ -198,9 +198,13 @@ internal sealed class DueCardMonitor : IDisposable
         catch (Exception ex)
         {
             AppLog.WriteFailure(operation, ex);
+            // Un fallo de transporte no confirma falta de Internet y puede incluir la URL autenticada.
+            string message = ex is HttpRequestException { StatusCode: null }
+                ? "No se pudo conectar con Trello. Revisa tu conexión a Internet y vuelve a intentarlo."
+                : ex.Message;
             Updated?.Invoke(new MonitorSnapshot(
                 true,
-                ex.Message,
+                message,
                 DateTimeOffset.Now,
                 Array.Empty<TrelloCard>(),
                 true));

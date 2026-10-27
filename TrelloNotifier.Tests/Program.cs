@@ -931,6 +931,8 @@ await Run("Fallo de API conserva historial y no emite notificaciones", async () 
     monitor.Updated += value => snapshot = value;
     await monitor.CheckNowAsync();
     Check(snapshot?.HasError == true, "Informar fallo.");
+    Check(snapshot?.Message == "No se pudo conectar con Trello. Revisa tu conexión a Internet y vuelve a intentarlo.",
+        "Mostrar un mensaje de conexión accionable en lugar del detalle técnico del transporte.");
     Check(fixture.Store.LoadNotifiedCards()["existente|123"] == now && fixture.Notifications.Batches.Count == 0, "No alterar historial ante fallo.");
 });
 

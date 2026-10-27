@@ -45,7 +45,7 @@
                             <TextBlock Text="Vincula tu cuenta de Trello o un servidor de pruebas." Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
                     </Grid>
-                    <TextBox x:Name="ApiBaseUrlTextBox" Header="URL base de la API" PlaceholderText="https://api.trello.com"
+                    <TextBox x:Name="ApiBaseUrlTextBox" Header="URL base de la API" PlaceholderText="https://api.trello.com" IsReadOnly="True"
                              Style="{StaticResource InputTextBoxStyle}" />
                     <TextBox x:Name="ApiKeyTextBox" Header="API key" PlaceholderText="Tu API key de Trello"
                              Style="{StaticResource InputTextBoxStyle}" />
