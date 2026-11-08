@@ -87,8 +87,7 @@ internal sealed class TrelloApiClient
             statusCode = (int)response.StatusCode;
             if (!response.IsSuccessStatusCode)
             {
-                throw new HttpRequestException(
-                    $"El servidor respondió {(int)response.StatusCode} ({response.ReasonPhrase}). Verifica la URL y las credenciales.");
+                throw new HttpRequestException("No fue posible autenticar la solicitud. Verifica tus credenciales e inténtalo nuevamente");
             }
 
             List<T> result = await response.Content.ReadFromJsonAsync<List<T>>(cancellationToken: cancellationToken)

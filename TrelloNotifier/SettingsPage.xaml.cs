@@ -34,7 +34,9 @@ public sealed partial class SettingsPage : Page
         ApiBaseUrlTextBox.Text = settings.ApiBaseUrl;
         ApiKeyPasswordBox.Password = settings.ApiKey;
         TokenPasswordBox.Password = settings.Token;
-        NotifyBeforeNumberBox.Value = settings.NotifyBeforeMinutes;
+        NotifyBeforeComboBox.SelectedItem = NotifyBeforeComboBox.Items
+            .OfType<ComboBoxItem>()
+            .FirstOrDefault(item => item.Tag?.ToString() == settings.NotifyBeforeMinutes.ToString());
         PollIntervalNumberBox.Value = settings.PollIntervalMinutes;
         RepeatReminderComboBox.SelectedItem = RepeatReminderComboBox.Items
             .OfType<ComboBoxItem>()
@@ -144,9 +146,9 @@ public sealed partial class SettingsPage : Page
             ApiBaseUrl = ApiBaseUrlTextBox.Text.Trim(),
             ApiKey = ApiKeyPasswordBox.Password.Trim(),
             Token = TokenPasswordBox.Password.Trim(),
-            NotifyBeforeMinutes = double.IsNaN(NotifyBeforeNumberBox.Value)
-                ? 0
-                : (int)NotifyBeforeNumberBox.Value,
+            NotifyBeforeMinutes = int.TryParse(
+                (NotifyBeforeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out int notifyBeforeMinutes)
+                ? notifyBeforeMinutes : 0,
             PollIntervalMinutes = double.IsNaN(PollIntervalNumberBox.Value)
                 ? 0
                 : (int)PollIntervalNumberBox.Value,
@@ -172,6 +174,12 @@ public sealed partial class SettingsPage : Page
             MainPage.Current?.ShowMessage(
                 "La API key y el token son obligatorios para la API oficial de Trello.",
                 InfoBarSeverity.Warning);
+            return false;
+        }
+
+        if (NotifyBeforeComboBox.SelectedItem is null)
+        {
+            MainPage.Current?.ShowMessage("Selecciona la anticipación de los recordatorios.", InfoBarSeverity.Warning);
             return false;
         }
 

@@ -14,10 +14,15 @@
                         </VisualState.StateTriggers>
                         <VisualState.Setters>
                             <Setter Target="SettingsActions.Orientation" Value="Vertical" />
-                            <Setter Target="NotifyBeforeNumberBox.(Grid.ColumnSpan)" Value="2" />
+                            <Setter Target="NotifyBeforeComboBox.(Grid.ColumnSpan)" Value="3" />
                             <Setter Target="PollIntervalNumberBox.(Grid.Row)" Value="1" />
                             <Setter Target="PollIntervalNumberBox.(Grid.Column)" Value="0" />
-                            <Setter Target="PollIntervalNumberBox.(Grid.ColumnSpan)" Value="2" />
+                            <Setter Target="PollIntervalNumberBox.(Grid.ColumnSpan)" Value="3" />
+                            <Setter Target="PollIntervalNumberBox.Margin" Value="0,12,0,0" />
+                            <Setter Target="RepeatReminderComboBox.(Grid.Row)" Value="2" />
+                            <Setter Target="RepeatReminderComboBox.(Grid.Column)" Value="0" />
+                            <Setter Target="RepeatReminderComboBox.(Grid.ColumnSpan)" Value="3" />
+                            <Setter Target="RepeatReminderComboBox.Margin" Value="0,12,0,0" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="WideSettings">
@@ -38,7 +43,7 @@
                         <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">
                             <FontIcon Glyph="&#xE71B;" FontSize="18" Foreground="{ThemeResource AppAccentTextBrush}" />
                         </Border>
-                        <StackPanel Grid.Column="1" Spacing="3">
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Text="Conexión" Style="{StaticResource SectionTitleStyle}" />
                         </StackPanel>
                     </Grid>
@@ -75,18 +80,30 @@
                                   OnContent="Activadas" OffContent="Desactivadas" IsOn="True" />
                     <TextBlock Text="Guarda los cambios para aplicar esta opción. Al desactivarla, las tarjetas siguen actualizándose sin mostrar avisos en el escritorio."
                                Style="{StaticResource CaptionTextStyle}" />
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="12">
-                        <NumberBox x:Name="NotifyBeforeNumberBox" Header="Anticipación (minutos)" Minimum="1" Maximum="10080"
-                                   MinHeight="40" SpinButtonPlacementMode="Compact" />
+                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="16">
+                        <ComboBox x:Name="NotifyBeforeComboBox" Header="Anticipación" PlaceholderText="Selecciona la anticipación"
+                                  Style="{StaticResource InputComboBoxStyle}">
+                            <ComboBoxItem Content="15 minutos" Tag="15" />
+                            <ComboBoxItem Content="30 minutos" Tag="30" />
+                            <ComboBoxItem Content="1 hora" Tag="60" />
+                            <ComboBoxItem Content="2 horas" Tag="120" />
+                            <ComboBoxItem Content="4 horas" Tag="240" />
+                            <ComboBoxItem Content="12 horas" Tag="720" />
+                            <ComboBoxItem Content="1 día" Tag="1440" />
+                            <ComboBoxItem Content="2 días" Tag="2880" />
+                            <ComboBoxItem Content="3 días" Tag="4320" />
+                            <ComboBoxItem Content="1 semana" Tag="10080" />
+                        </ComboBox>
                         <NumberBox x:Name="PollIntervalNumberBox" Grid.Column="1" Header="Comprobar cada (minutos)" Minimum="1" Maximum="1440"
                                    MinHeight="40" SpinButtonPlacementMode="Compact" />
+                        <ComboBox x:Name="RepeatReminderComboBox" Grid.Column="2" Header="Repetir recordatorios cada"
+                                  Style="{StaticResource InputComboBoxStyle}">
+                            <ComboBoxItem Content="Nunca" Tag="0" />
+                            <ComboBoxItem Content="15 minutos" Tag="15" />
+                            <ComboBoxItem Content="30 minutos" Tag="30" />
+                            <ComboBoxItem Content="60 minutos" Tag="60" />
+                        </ComboBox>
                     </Grid>
-                    <ComboBox x:Name="RepeatReminderComboBox" Header="Repetir recordatorios cada" Style="{StaticResource InputComboBoxStyle}">
-                        <ComboBoxItem Content="Nunca" Tag="0" />
-                        <ComboBoxItem Content="15 minutos" Tag="15" />
-                        <ComboBoxItem Content="30 minutos" Tag="30" />
-                        <ComboBoxItem Content="60 minutos" Tag="60" />
-                    </ComboBox>
                     <TextBlock Text="El primer aviso se envía al detectar la tarjeta. Las repeticiones se envían en la primera comprobación tras cumplirse el intervalo, también al pulsar Comprobar ahora."
                                Style="{StaticResource CaptionTextStyle}" />
                     <Border BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
@@ -107,7 +124,7 @@
                         <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">
                             <FontIcon Glyph="&#xE790;" FontSize="18" Foreground="{ThemeResource AppAccentTextBrush}" />
                         </Border>
-                        <StackPanel Grid.Column="1" Spacing="3">
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Text="Apariencia" Style="{StaticResource SectionTitleStyle}" />
                         </StackPanel>
                     </Grid>

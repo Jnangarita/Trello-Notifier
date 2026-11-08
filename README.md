@@ -206,7 +206,7 @@ está desactivado. Los avisos ya enviados a Windows no se retiran.
 La consulta y los filtros de **Mis tarjetas** son independientes de qué tarjetas generan avisos.
 
 1. Abre **Configuración**, en la sección **Monitor**.
-2. Define **Avisar con esta anticipación (minutos)** para elegir qué vencimientos próximos se incluyen.
+2. Selecciona **Anticipación** para elegir qué vencimientos próximos se incluyen: **15 minutos**, **30 minutos**, **1 hora**, **2 horas**, **4 horas**, **12 horas**, **1 día**, **2 días**, **3 días** o **1 semana**. El valor predeterminado es **1 hora**. Si tenías guardado un intervalo diferente, selecciona una de estas opciones antes de guardar; no se sustituye automáticamente el valor anterior.
 3. Define **Comprobar cada (minutos)** para elegir con qué frecuencia se consulta Trello.
 4. Selecciona **Repetir recordatorios cada**: **Nunca**, **15 minutos**, **30 minutos** o **60 minutos**. **Nunca** permite únicamente el primer aviso por tarjeta y fecha de vencimiento.
 5. Opcionalmente, activa **Incluir tarjetas vencidas pendientes**. Está desactivado por defecto. Cuando está activo, sus avisos se repiten cada **2 horas** desde el último aviso de esa tarjeta, en lugar del intervalo de las próximas a vencer. **Nunca** desactiva también las repeticiones de vencidas. Las vencidas se pueden consultar en **Mis tarjetas** aunque esta opción esté desactivada.
