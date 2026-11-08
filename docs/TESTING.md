@@ -148,6 +148,10 @@ tardíos. Probar error HTTP, JSON inválido, timeout, configuración ausente y r
 conservar filtros tras error y actualizar tableros por ID tras una consulta correcta.
 Comprobar temas, diseño compacto y apertura de enlaces también en Historial.
 
+En ambas vistas, un timeout debe mostrar «Tiempo de espera agotado» y
+«El servidor tardó demasiado en responder. Inténtalo nuevamente en unos momentos.»;
+una consulta correcta posterior debe retirar el título y el error.
+
 Si cambian los estilos, alternar **Claro**, **Oscuro** y **Usar configuración de
 Windows** desde Apariencia y volver al dashboard. Comprobar fondos, texto secundario,
 insignias, desplegables, InfoBar y estados de foco, hover y deshabilitado. Revisar

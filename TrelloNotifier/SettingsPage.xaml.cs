@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using TrelloNotifier.Models;
 using TrelloNotifier.Services;
 
@@ -30,7 +32,7 @@ public sealed partial class SettingsPage : Page
     private void LoadSettings(AppSettings settings)
     {
         ApiBaseUrlTextBox.Text = settings.ApiBaseUrl;
-        ApiKeyTextBox.Text = settings.ApiKey;
+        ApiKeyPasswordBox.Password = settings.ApiKey;
         TokenPasswordBox.Password = settings.Token;
         NotifyBeforeNumberBox.Value = settings.NotifyBeforeMinutes;
         PollIntervalNumberBox.Value = settings.PollIntervalMinutes;
@@ -46,6 +48,20 @@ public sealed partial class SettingsPage : Page
             .OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), settings.Theme, StringComparison.Ordinal))
             ?? ThemeComboBox.Items[0];
+    }
+
+    private void RevealCredential_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton button)
+        {
+            bool isApiKey = button == ApiKeyRevealButton;
+            PasswordBox field = isApiKey ? ApiKeyPasswordBox : TokenPasswordBox;
+            bool isVisible = button.IsChecked == true;
+            field.PasswordRevealMode = isVisible ? PasswordRevealMode.Visible : PasswordRevealMode.Hidden;
+            string action = isVisible ? "Ocultar" : "Mostrar";
+            button.Content = action;
+            AutomationProperties.SetName(button, $"{action} {(isApiKey ? "API key" : "token")}");
+        }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -126,7 +142,7 @@ public sealed partial class SettingsPage : Page
         settings = new AppSettings
         {
             ApiBaseUrl = ApiBaseUrlTextBox.Text.Trim(),
-            ApiKey = ApiKeyTextBox.Text.Trim(),
+            ApiKey = ApiKeyPasswordBox.Password.Trim(),
             Token = TokenPasswordBox.Password.Trim(),
             NotifyBeforeMinutes = double.IsNaN(NotifyBeforeNumberBox.Value)
                 ? 0
@@ -146,7 +162,7 @@ public sealed partial class SettingsPage : Page
         if (!Uri.TryCreate(settings.ApiBaseUrl, UriKind.Absolute, out Uri? apiUri) ||
             (apiUri.Scheme != Uri.UriSchemeHttp && apiUri.Scheme != Uri.UriSchemeHttps))
         {
-            MainPage.Current?.ShowMessage("Introduce una URL base HTTP o HTTPS válida.", InfoBarSeverity.Warning);
+            MainPage.Current?.ShowMessage("No se pudo conectar con el servidor. Verifica la dirección.", InfoBarSeverity.Warning);
             return false;
         }
 

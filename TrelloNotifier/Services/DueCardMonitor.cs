@@ -195,6 +195,11 @@ internal sealed class DueCardMonitor : IDisposable
         {
             outcome = "Cancelled";
         }
+        catch (OperationCanceledException ex)
+        {
+            AppLog.WriteFailure(operation, ex);
+            Updated?.Invoke(MonitorSnapshot.CreateTimeout(DateTimeOffset.Now));
+        }
         catch (Exception ex)
         {
             AppLog.WriteFailure(operation, ex);

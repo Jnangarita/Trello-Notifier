@@ -127,6 +127,10 @@ public sealed partial class DashboardPage : Page
             snapshot = new MonitorSnapshot(true,
                 "No se pudo consultar el historial. Revisa la conexión y la configuración e inténtalo de nuevo.",
                 null, Array.Empty<TrelloCard>(), true);
+            if (ex is OperationCanceledException)
+            {
+                snapshot = MonitorSnapshot.CreateTimeout(null);
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -154,6 +158,7 @@ public sealed partial class DashboardPage : Page
     private void DisplaySnapshot(MonitorSnapshot snapshot)
     {
         _snapshot = snapshot;
+        MonitorInfoBar.Title = snapshot.Title;
         MonitorInfoBar.Message = snapshot.Message;
         MonitorInfoBar.Severity = snapshot.HasError ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
         MonitorInfoBar.IsOpen = snapshot.HasError || !snapshot.IsRunning;

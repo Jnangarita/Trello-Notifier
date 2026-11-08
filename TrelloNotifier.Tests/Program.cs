@@ -936,6 +936,29 @@ await Run("Fallo de API conserva historial y no emite notificaciones", async () 
     Check(fixture.Store.LoadNotifiedCards()["existente|123"] == now && fixture.Notifications.Batches.Count == 0, "No alterar historial ante fallo.");
 });
 
+await Run("Timeout muestra un aviso comprensible y permite recuperarse sin alterar el historial", async () =>
+{
+    using var fixture = new Fixture();
+    fixture.Store.SaveNotifiedCards(new() { ["existente|123"] = now });
+    fixture.Api.BeforeResponse = () => throw new TaskCanceledException("Detalle técnico del timeout HTTP");
+    using var monitor = fixture.CreateMonitor();
+    MonitorSnapshot? snapshot = null;
+    monitor.Updated += value => snapshot = value;
+
+    await monitor.CheckNowAsync();
+
+    Check(snapshot is { HasError: true, Title: "Tiempo de espera agotado", AssignedCards.Count: 0 },
+        "El timeout muestra un título en español y no presenta tarjetas obsoletas.");
+    Check(snapshot?.Message == "El servidor tardó demasiado en responder. Inténtalo nuevamente en unos momentos.",
+        "Mostrar el mensaje solicitado sin detalles técnicos.");
+    Check(fixture.Store.LoadNotifiedCards()["existente|123"] == now && fixture.Notifications.Batches.Count == 0,
+        "El timeout no altera el historial ni envía avisos.");
+
+    fixture.Api.BeforeResponse = null;
+    await monitor.CheckNowAsync();
+    Check(snapshot is { HasError: false, Title: "" }, "Una consulta correcta retira el título y el error de timeout.");
+});
+
 await Run("Completadas, archivadas o ausentes dejan de avisar y un nuevo vencimiento se reevalúa", async () =>
 {
     using var fixture = new Fixture();

@@ -30,8 +30,6 @@
 
             <StackPanel Spacing="6" Margin="0,0,0,4">
                 <TextBlock Text="Configuración" Style="{StaticResource PageTitleStyle}" />
-                <TextBlock Text="Tu conexión, tus recordatorios y tu espacio de trabajo."
-                           Style="{StaticResource SecondaryTextStyle}" />
             </StackPanel>
 
             <Border Style="{StaticResource PanelStyle}">
@@ -42,16 +40,22 @@
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="3">
                             <TextBlock Text="Conexión" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="Vincula tu cuenta de Trello o un servidor de pruebas." Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
                     </Grid>
-                    <TextBox x:Name="ApiBaseUrlTextBox" Header="URL base de la API" PlaceholderText="https://api.trello.com" IsReadOnly="True"
+                    <TextBox x:Name="ApiBaseUrlTextBox" Header="Servidor" PlaceholderText="https://api.trello.com" IsReadOnly="True"
                              Style="{StaticResource InputTextBoxStyle}" />
-                    <TextBox x:Name="ApiKeyTextBox" Header="API key" PlaceholderText="Tu API key de Trello"
-                             Style="{StaticResource InputTextBoxStyle}" />
-                    <PasswordBox x:Name="TokenPasswordBox" Header="Token" PlaceholderText="Tu token de autorización"
-                                 Style="{StaticResource InputPasswordBoxStyle}" />
-                    <TextBlock Text="Las credenciales son opcionales cuando utilizas una URL simulada." Style="{StaticResource CaptionTextStyle}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <PasswordBox x:Name="ApiKeyPasswordBox" Header="API key" PlaceholderText="Tu API key de Trello"
+                                     PasswordRevealMode="Hidden" Style="{StaticResource InputPasswordBoxStyle}" />
+                        <ToggleButton x:Name="ApiKeyRevealButton" Grid.Column="1" Content="Mostrar" VerticalAlignment="Bottom"
+                                      MinHeight="40" AutomationProperties.Name="Mostrar API key" Click="RevealCredential_Click" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <PasswordBox x:Name="TokenPasswordBox" Header="Token" PlaceholderText="Tu token de autorización"
+                                     PasswordRevealMode="Hidden" Style="{StaticResource InputPasswordBoxStyle}" />
+                        <ToggleButton x:Name="TokenRevealButton" Grid.Column="1" Content="Mostrar" VerticalAlignment="Bottom"
+                                      MinHeight="40" AutomationProperties.Name="Mostrar token" Click="RevealCredential_Click" />
+                    </Grid>
                     <HyperlinkButton Content="Obtener API key y token en Trello" NavigateUri="https://trello.com/app-key" Padding="0" />
                 </StackPanel>
             </Border>
@@ -105,7 +109,6 @@
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="3">
                             <TextBlock Text="Apariencia" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="Un espacio cómodo, de día o de noche." Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
                     </Grid>
                     <ComboBox x:Name="ThemeComboBox" Header="Tema" SelectionChanged="Theme_SelectionChanged"
@@ -114,8 +117,6 @@
                         <ComboBoxItem Content="Claro" Tag="Light" />
                         <ComboBoxItem Content="Oscuro" Tag="Dark" />
                     </ComboBox>
-                    <TextBlock Text="El tema se aplica al seleccionarlo. Guarda los cambios para conservar tu preferencia."
-                               Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
             </Border>
 

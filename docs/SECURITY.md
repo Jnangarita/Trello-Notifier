@@ -9,7 +9,8 @@ El ejemplo del README permite tokens sin caducidad, lo cual requiere custodia.
 `SettingsStore` guarda `trello-notifier.db` bajo `%LOCALAPPDATA%\Trello Notifier`.
 Los anteriores `settings.json` y `notified-cards.json` se importan una sola vez
 y se conservan como respaldo. Las credenciales **no están cifradas**; el
-PasswordBox solo oculta su visualización. El historial contiene identificadores
+PasswordBox solo oculta su visualización. API key y token se muestran ocultos por
+defecto; cada campo tiene un botón Mostrar/Ocultar independiente. El historial contiene identificadores
 y fechas. No añadir esos archivos a Git, logs, fixtures ni contexto IA.
 `.gitignore`/`.ignore` reducen accidentes, pero no protegen el archivo en disco.
 Todas las consultas SQLite con valores usan parámetros. Los errores del motor

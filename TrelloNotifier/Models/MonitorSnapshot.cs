@@ -7,8 +7,19 @@ public sealed record MonitorSnapshot(
     IReadOnlyList<TrelloCard> DueSoonCards,
     bool HasError = false)
 {
+    public string Title { get; init; } = string.Empty;
     public IReadOnlyList<TrelloCard> AssignedCards { get; init; } = Array.Empty<TrelloCard>();
     public int NotifyBeforeMinutes { get; init; }
+
+    public static MonitorSnapshot CreateTimeout(DateTimeOffset? lastCheck) => new(
+        true,
+        "El servidor tardó demasiado en responder. Inténtalo nuevamente en unos momentos.",
+        lastCheck,
+        Array.Empty<TrelloCard>(),
+        true)
+    {
+        Title = "Tiempo de espera agotado"
+    };
 
     public IEnumerable<TrelloCard> GetCards(TrelloCardScope scope) => scope switch
     {
