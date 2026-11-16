@@ -45,25 +45,29 @@ La interfaz y la distribución del proyecto parten de la plantilla WinUI 3 de `c
 
 El enlace `https://trello.com/app-key` puede dirigirte a ese panel. La sección **OAuth 2.0** no necesita configurarse para Trello Notifier: puedes dejar sin configurar la URL de devolución de llamada, el tipo de seguridad del cliente y los scopes de esa sección. El **ID de cliente de OAuth 2.0 no es la API key**.
 
-### 2. Generar el token de lectura
+### 2. Generar un token de solo lectura o de lectura y escritura
 
-1. Copia la siguiente URL y sustituye `TU_API_KEY` por la clave obtenida en el paso anterior:
+1. Elige la URL según las funciones que necesites y sustituye `TU_API_KEY` por la clave obtenida en el paso anterior:
+
+   **Solo lectura (`scope=read`):** permite consultar tus tarjetas y recibir avisos, pero no crear tarjetas.
 
    ```text
    https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&name=Trello%20Notifier&key=TU_API_KEY
    ```
 
+   **Lectura y escritura (`scope=read,write`):** permite consultar tus tarjetas, recibir avisos y usar **Creación manual** y **Creación masiva**.
+
    ```text
-   https://trello.com/1/authorize?expiration=never&scope=read,write,account&response_type=token&key=TU_API_KEY
+   https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&name=Trello%20Notifier&key=TU_API_KEY
    ```
 
 2. Abre la URL completa en el navegador con tu sesión de Trello iniciada.
 3. Comprueba que estás autorizando la cuenta correcta y pulsa **Permitir / Allow**.
 4. Copia el **token** que Trello muestra al finalizar.
 
-El parámetro `scope=read` solicita el permiso de lectura que necesita la aplicación. `expiration=never` indica que el token no caduca automáticamente; puedes revocarlo desde la configuración de tu cuenta de Trello, en **Aplicaciones**.
+`expiration=never` indica que el token no caduca automáticamente; puedes revocarlo desde la configuración de tu cuenta de Trello, en **Aplicaciones**. El permiso adicional `account` no es necesario para estas funciones.
 
-Para usar **Creación manual** o **Creación masiva**, autoriza un token con `scope=read,write` en esa URL y guárdalo en Configuración. Los tokens de solo lectura siguen sirviendo para consultar tarjetas y recibir avisos, pero no permiten crearlas. La cuenta también debe poder escribir en el tablero de destino.
+Para crear tarjetas, la cuenta también debe poder escribir en el tablero de destino. Si ya tenías un token de solo lectura, genera uno nuevo con lectura y escritura y reemplázalo en Configuración; el token anterior no se actualiza automáticamente.
 
 ### 3. Introducir los datos en Trello Notifier
 
@@ -74,7 +78,7 @@ Para usar **Creación manual** o **Creación masiva**, autoriza un token con `sc
    | --- | --- |
    | **URL base de la API** | `https://api.trello.com` (solo lectura). |
    | **API key** | La clave copiada de **Trello Auth**. |
-   | **Token** | El token obtenido al autorizar el acceso de lectura. |
+   | **Token** | El token de solo lectura o de lectura y escritura obtenido en el paso anterior. |
 
    La URL base no debe incluir `/1/members/me/cards` ni las credenciales: la aplicación añade la ruta y los parámetros necesarios.
 
@@ -379,6 +383,18 @@ de completado o archivado. No se guardan nuevas tablas ni datos históricos loca
 
 Empieza por [AGENTS.md](AGENTS.md) y el [contexto mínimo](.ai/context.md).
 Consulta solo la documentación específica necesaria para la tarea.
+
+El proyecto incluye dos skills de OpenCode en `.opencode/skills/`:
+
+- [`winui3-ui`](.opencode/skills/winui3-ui/SKILL.md): vistas WinUI/XAML, mockups,
+  estilos, temas, accesibilidad y validación visual.
+- [`trello-api`](.opencode/skills/trello-api/SKILL.md): integración con Trello,
+  autenticación, permisos, errores HTTP y reintentos de creación.
+
+OpenCode puede cargarlas cuando la tarea corresponda. También puedes pedirlas
+explícitamente con `@winui3-ui` o `@trello-api` en tu mensaje. Sus procedimientos
+complementan las reglas de `AGENTS.md` y enlazan la documentación del proyecto.
+
 Para ejecutar formato, lint, análisis estático, pruebas funcionales y
 arquitectónicas, auditoría de dependencias y compilación:
 
