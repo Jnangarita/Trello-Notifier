@@ -34,6 +34,11 @@ los archivos auxiliares `.db-journal`, `.db-wal` y `.db-shm`.
 
 ## Información sensible y errores
 
+El visor de Diagnóstico lee únicamente los archivos `trello-notifier-AAAAMMDD[_NNN].log`
+del directorio configurado por `AppLog`; no admite rutas proporcionadas por el usuario.
+Lee como máximo 2 MiB por archivo, muestra texto literal y no ejecuta enlaces ni contenido.
+Las pruebas del lector usan archivos ficticios; no cargar logs reales en contexto de IA.
+
 La importación CSV lee solo el archivo elegido por el usuario, comprueba el límite de
 2 MiB antes de cargarlo y admite hasta 1000 filas. No se registran ruta, contenido ni
 nombres de tarjetas en logs. La exportación escapa comillas/separadores y antepone un

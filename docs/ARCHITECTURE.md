@@ -9,6 +9,7 @@ Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework
 App → MainWindow / MainPage → DashboardPage / SettingsPage
 MainPage → CreateCardPage → SettingsStore / TrelloApiClient
 MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
+MainPage → DiagnosticsPage → AppLogReader → archivos locales de AppLog
 App / páginas → AppServices (composición de instancias concretas)
 DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
 DashboardPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
@@ -67,6 +68,15 @@ datos de excepción a propiedades técnicas y observa fallos internos sin copiar
 su contenido. `LogContext` propaga `CheckId` dentro de una comprobación. Los
 errores se registran donde se capturan y los servicios añaden resultados/tiempos.
 No se incorpora un contenedor DI ni persistencia de logs en SQLite.
+
+`DiagnosticsPage` accede al lector compartido de `AppServices` y reutiliza los colores
+y estados visuales de las filas. `AppLog` expone el directorio configurado y el prefijo
+de archivos para que escritura y lectura tengan un único origen. `AppLogReader`
+enumera solo archivos del logger, interpreta su cabecera y devuelve
+`DiagnosticLogSnapshot`/`DiagnosticLogEntry` sin dependencias de UI. Lee en el pool de
+hilos, comparte el archivo con el escritor y limita cada lectura a los últimos 2 MiB
+y 1000 líneas completas. Las líneas sin cabecera se conservan como Otros; ERROR/FATAL
+comparten gravedad. La vista filtra en memoria, cancela al salir y actualiza bajo demanda.
 
 ## Responsabilidades y dependencias
 | Área | Permitido actualmente | No introducir |

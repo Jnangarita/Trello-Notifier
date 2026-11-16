@@ -53,7 +53,14 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        NavigateToCards((args.InvokedItemContainer as NavigationViewItem)?.Tag as string == "History"
+        string? tag = (args.InvokedItemContainer as NavigationViewItem)?.Tag as string;
+        if (tag == "Diagnostics")
+        {
+            if (ContentFrame.Navigate(typeof(DiagnosticsPage))) Navigation.Header = "Diagnóstico";
+            return;
+        }
+
+        NavigateToCards(tag == "History"
             ? TrelloCardScope.History : TrelloCardScope.Pending);
     }
 

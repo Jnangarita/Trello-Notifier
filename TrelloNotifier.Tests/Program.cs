@@ -1117,6 +1117,131 @@ await Run("Completadas, archivadas o ausentes dejan de avisar y un nuevo vencimi
     Check(fixture.Store.LoadNotifiedCards().Count == 1, "Retirar claves completadas, archivadas, ausentes y del vencimiento anterior.");
 });
 
+await Run("Diagnóstico: interpreta cabeceras y distingue nivel de palabras del mensaje", () =>
+{
+    string timestamp = "2026-11-16T09:30:45.123-05:00";
+    foreach (var (level, expectedLevel, severity) in new[]
+    {
+        ("INFO", "INFO", "Info"), ("WARN", "WARN", "Warning"), ("ERROR", "ERROR", "Error"),
+        ("FATAL", "FATAL", "Error"), ("DEBUG", "DEBUG", "Other"), ("TRACE", "TRACE", "Other"),
+        ("INFOR", "INFO", "Info"), ("WARNI", "WARN", "Warning")
+    })
+    {
+        DiagnosticLogEntry entry = AppLogReader.ParseLine($"{timestamp} {level,5} 123 --- [TrelloNotifier] Componente   : Mensaje con ERROR y WARN [session=prueba check=]");
+        Check(entry.Level == expectedLevel && entry.Severity == severity, "Clasificar el nivel de la cabecera, no el contenido.");
+        Check(entry.Timestamp == new DateTimeOffset(2026, 11, 16, 9, 30, 45, 123, TimeSpan.FromHours(-5)), "Conservar instante y offset.");
+        Check(entry.Source == "Componente" && entry.Message == "Mensaje con ERROR y WARN [session=prueba check=]", "Conservar mensaje y correlación sin el relleno del componente.");
+    }
+    foreach (string line in new[] { "Texto suelto con ERROR", "2026-99-16T09:30:45.123-05:00 ERROR 123 --- [TrelloNotifier] Componente : Fecha inválida", "Línea adicional" })
+    {
+        DiagnosticLogEntry entry = AppLogReader.ParseLine(line);
+        Check(entry.Severity == "Other" && entry.Timestamp is null && entry.Message == line, "Mostrar líneas no reconocidas sin inventar nivel ni perder contenido.");
+    }
+    return Task.CompletedTask;
+});
+
+await Run("Diagnóstico: lee el formato real de Serilog y conserva los niveles", async () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    string directory = Path.Combine(fixture.DirectoryPath, "Logs");
+    AppLog.Initialize(directory, debug: true);
+    try
+    {
+        Log.ForContext("SourceContext", "ComponenteFicticio").Debug("Detalle de prueba");
+        Log.Information("Solicitud HTTP POST TrelloCard: estado 200; éxito True");
+        Log.Warning("Advertencia de prueba");
+        Log.Error("Error de prueba");
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
+    Check(AppLog.DirectoryPath == directory, "El visor comparte el destino configurado por el logger.");
+    var reader = new AppLogReader(AppLog.DirectoryPath);
+    IReadOnlyList<string> files = await reader.GetFilesAsync(CancellationToken.None);
+    Check(files.Count == 1, "Reconocer el nombre de archivo que genera Serilog.");
+    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(files[0], CancellationToken.None);
+    Check(snapshot.Entries.Select(entry => entry.Level).SequenceEqual(new[] { "ERROR", "WARN", "INFO", "DEBUG" }), "Mostrar primero lo más reciente.");
+    Check(snapshot.Entries.All(entry => entry.Timestamp is not null) && !snapshot.IsTruncated, "Leer las fechas reales sin truncar un archivo pequeño.");
+    Check(snapshot.Entries.Last().Source == "ComponenteFicticio", "Conservar el origen del evento.");
+});
+
+await Run("Diagnóstico: comparte el archivo activo y espera líneas completas", async () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    const string fileName = "trello-notifier-20261116.log";
+    string path = Path.Combine(fixture.DirectoryPath, fileName);
+    using var writer = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), new System.Text.UTF8Encoding(true));
+    await writer.WriteAsync("2026-11-16T09:00:00.000+00:00 INFO 123 --- [TrelloNotifier] Prueba : Completo\r\n\r\nParcial");
+    await writer.FlushAsync();
+    var reader = new AppLogReader(fixture.DirectoryPath);
+    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
+    Check(snapshot.Entries.Count == 1 && snapshot.Entries[0].Level == "INFO", "Admitir BOM y archivo abierto sin mostrar una escritura a medias.");
+    await writer.WriteAsync(" terminado\r\n");
+    await writer.FlushAsync();
+    snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
+    Check(snapshot.Entries.Count == 2 && snapshot.Entries[0].Message == "Parcial terminado", "Actualizar sin duplicados y conservar líneas fuera del formato.");
+    await writer.DisposeAsync();
+    await File.WriteAllTextAsync(path, string.Empty);
+    Check((await reader.ReadRecentAsync(fileName, CancellationToken.None)).Entries.Count == 0, "Admitir un archivo vacío o recién truncado.");
+});
+
+await Run("Diagnóstico: limita líneas y bytes manteniendo los últimos registros UTF-8", async () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    const string fileName = "trello-notifier-20261116.log";
+    string path = Path.Combine(fixture.DirectoryPath, fileName);
+    var reader = new AppLogReader(fixture.DirectoryPath);
+    await File.WriteAllLinesAsync(path, Enumerable.Range(0, AppLogReader.MaxEntries + 3).Select(index => $"Registro {index}"));
+    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
+    Check(snapshot.IsTruncated && snapshot.Entries.Count == AppLogReader.MaxEntries, "Limitar la cantidad visible.");
+    Check(snapshot.Entries[0].Message == $"Registro {AppLogReader.MaxEntries + 2}" && snapshot.Entries.Last().Message == "Registro 3", "Descartar solo los registros más antiguos.");
+    await File.WriteAllTextAsync(path, new string('ñ', AppLogReader.MaxReadBytes) + "\nÚltimo registro completo\n");
+    snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
+    Check(snapshot.IsTruncated && snapshot.Entries.Count == 1 && snapshot.Entries[0].Message == "Último registro completo", "Descartar el fragmento UTF-8 inicial y conservar líneas completas al limitar bytes.");
+});
+
+await Run("Diagnóstico: restringe archivos y permite cancelar o recuperar tras rotación", async () =>
+{
+    using var fixture = new Fixture(initialize: false);
+    var reader = new AppLogReader(fixture.DirectoryPath);
+    Check((await new AppLogReader(Path.Combine(fixture.DirectoryPath, "Ausente")).GetFilesAsync(CancellationToken.None)).Count == 0, "Una carpeta todavía no creada muestra estado vacío.");
+    const string oldName = "trello-notifier-20261115.log";
+    const string newName = "trello-notifier-20261116_001.log";
+    foreach (string name in new[] { oldName, newName, "ajustes.json", "otro.log", "trello-notifier-incorrecto.log" })
+        await File.WriteAllTextAsync(Path.Combine(fixture.DirectoryPath, name), "Dato ficticio\n");
+    File.SetLastWriteTimeUtc(Path.Combine(fixture.DirectoryPath, oldName), new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc));
+    File.SetLastWriteTimeUtc(Path.Combine(fixture.DirectoryPath, newName), new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc));
+    Check((await reader.GetFilesAsync(CancellationToken.None)).SequenceEqual(new[] { newName, oldName }), "Listar solo logs propios, incluidos archivos rotados, del más reciente al más antiguo.");
+    foreach (string invalid in new[] { "../" + newName, "..\\" + newName, Path.Combine(fixture.DirectoryPath, newName), "otro.log", newName + "\n" })
+    {
+        bool rejected = false;
+        try { await reader.ReadRecentAsync(invalid, CancellationToken.None); }
+        catch (ArgumentException) { rejected = true; }
+        Check(rejected, "Impedir lecturas fuera de la carpeta o con nombres ajenos al logger.");
+    }
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+    bool cancelled = false;
+    try { await reader.ReadRecentAsync(newName, cancellation.Token); }
+    catch (OperationCanceledException) { cancelled = true; }
+    Check(cancelled, "La navegación puede cancelar la lectura.");
+    File.Delete(Path.Combine(fixture.DirectoryPath, newName));
+    bool missing = false;
+    try { await reader.ReadRecentAsync(newName, CancellationToken.None); }
+    catch (FileNotFoundException) { missing = true; }
+    Check(missing, "La desaparición entre listado y lectura debe ser observable.");
+    Check((await reader.GetFilesAsync(CancellationToken.None)).SequenceEqual(new[] { oldName }), "Actualizar elimina archivos que ya rotaron.");
+    using (var locked = new FileStream(Path.Combine(fixture.DirectoryPath, oldName), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+    {
+        bool failed = false;
+        try { await reader.ReadRecentAsync(oldName, CancellationToken.None); }
+        catch (IOException) { failed = true; }
+        Check(failed, "No ocultar fallos de acceso al archivo.");
+    }
+    Check((await reader.ReadRecentAsync(oldName, CancellationToken.None)).Entries.Count == 1, "Permitir recuperación después de liberar el archivo.");
+});
+
 await Run("Logs: errores sin secretos y vaciado de la cola al cerrar", () =>
 {
     using var fixture = new Fixture(initialize: false);

@@ -95,6 +95,16 @@ anterior se retiró al modificar la carga de preferencias para SQLite.
 
 ## Comprobación manual cuando cambie UI
 
+En **Diagnóstico**, usar archivos ficticios del formato de `AppLog`: comprobar INFO
+azul, WARN amarillo, ERROR/FATAL rojo y DEBUG/TRACE/líneas sin cabecera neutros en temas
+claro, oscuro y contraste. Cambiar archivo/nivel, actualizar, seleccionar texto y
+desplazar la lista para verificar colores al reciclar filas. Probar ventana estrecha,
+carpeta/archivo vacíos, desaparición por rotación, acceso bloqueado y navegación durante
+la carga. El runner cubre el formato real de Serilog, interpretación de cabeceras,
+orden, BOM/UTF-8, límites de bytes/líneas, escritura concurrente, líneas incompletas,
+nombres de archivo restringidos, cancelación y recuperación tras rotación/bloqueo,
+siempre en la carpeta temporal de `Fixture`.
+
 En **Creación masiva**, usar un CSV de ejemplo sin datos privados y un mock local:
 elegir/cancelar archivos, arrastrar un único CSV (rechazar varios archivos o carpetas),
 guardar plantilla/resultados, probar UTF-8 con BOM, comillas,

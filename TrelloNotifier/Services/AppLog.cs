@@ -9,9 +9,13 @@ namespace TrelloNotifier.Services;
 
 internal static class AppLog
 {
+    public const string FileNamePrefix = "trello-notifier-";
+    private static readonly string DefaultDirectoryPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Trello Notifier", "Logs");
     private static int _hasWriteFailure;
 
     public static bool HasWriteFailure => Volatile.Read(ref _hasWriteFailure) != 0;
+    public static string DirectoryPath { get; private set; } = DefaultDirectoryPath;
 
     public static void Initialize(string? directoryPath = null, bool debug = false)
     {
@@ -20,10 +24,8 @@ internal static class AppLog
         SelfLog.Enable(_ => ReportWriteFailure());
         try
         {
-            directoryPath ??= Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Trello Notifier", "Logs");
-            Directory.CreateDirectory(directoryPath);
+            DirectoryPath = directoryPath ?? DefaultDirectoryPath;
+            Directory.CreateDirectory(DirectoryPath);
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Is(debug ? LogEventLevel.Debug : LogEventLevel.Information)
                 .Enrich.FromLogContext()
@@ -32,7 +34,7 @@ internal static class AppLog
                 .Enrich.WithProperty("ProcessId", Environment.ProcessId)
                 .Enrich.WithProperty("SourceContext", "TrelloNotifier")
                 .WriteTo.Async(sink => sink.File(
-                    Path.Combine(directoryPath, "trello-notifier-.log"),
+                    Path.Combine(DirectoryPath, FileNamePrefix + ".log"),
                     outputTemplate: "{Timestamp:yyyy-MM-ddTHH:mm:ss.fffzzz} {LevelLabel,5:l} {ProcessId} --- [TrelloNotifier] {SourceContext,-48:l} : {Message:l} [session={SessionId} check={CheckId}]{NewLine}",
                     formatProvider: System.Globalization.CultureInfo.InvariantCulture,
                     rollingInterval: RollingInterval.Day,

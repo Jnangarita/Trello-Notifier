@@ -96,6 +96,18 @@ Referencia: [documentación oficial de autorización de Trello](https://develope
 
 ## Logs y diagnóstico
 
+Abre **Diagnóstico** en el menú lateral para consultar los logs dentro de la app.
+Selecciona un archivo y filtra por nivel: **INFO** en azul, **WARN** en amarillo,
+**ERROR/FATAL** en rojo; **DEBUG/TRACE** y líneas sin cabecera se muestran en tono neutro.
+Cada fila muestra fecha/hora local, componente y mensaje seleccionable para copiar.
+**Actualizar** renueva la lista de archivos y los registros del archivo seleccionado;
+la vista carga al entrar y no realiza sondeo automático.
+
+Se muestran primero las líneas más recientes, hasta **1000 líneas completas de los
+últimos 2 MiB** de cada archivo, con un aviso cuando se limita la lectura. El filtro
+se aplica a ese conjunto cargado. Los archivos rotados también se pueden seleccionar.
+Una línea que aún se está escribiendo aparece al actualizar después de completarse.
+
 Los logs se guardan automáticamente en:
 
 ```text

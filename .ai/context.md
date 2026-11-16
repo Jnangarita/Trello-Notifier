@@ -35,6 +35,9 @@ lotes secuenciales con el mismo cliente. `CardCsvImporter` reutiliza TextFieldPa
 de .NET, valida fechas/usuarios y exporta resultados; `CardImportRow` guarda estados
 en memoria para no reenviar creadas o inciertas. Se puede detener entre solicitudes.
 `Styles.xaml` contiene los estilos compartidos.
+`DiagnosticsPage` consulta logs locales vía `AppLogReader`, con selector de archivo,
+filtro por nivel y colores del tema. Lee en segundo plano hasta 1000 líneas completas
+de los últimos 2 MiB; actualiza al entrar o bajo demanda y cancela al navegar.
 
 `Models/` contiene `AppSettings`, `TrelloCard` (también DTO JSON; `closed` es
 independiente de `dueComplete`; `GetStatus` clasifica vencimientos con

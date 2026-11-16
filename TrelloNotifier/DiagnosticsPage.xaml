@@ -1,0 +1,130 @@
+<Page
+    x:Class="TrelloNotifier.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Foreground="{ThemeResource AppTextPrimaryBrush}"
+    Loaded="Page_Loaded" Unloaded="Page_Unloaded">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="16" Margin="0,0,12,0">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="CompactDiagnostics">
+                    <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="FileComboBox.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="LevelComboBox.(Grid.Row)" Value="1" />
+                        <Setter Target="LevelComboBox.(Grid.Column)" Value="0" />
+                        <Setter Target="RefreshButton.(Grid.Row)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="WideDiagnostics">
+                    <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1100" /></VisualState.StateTriggers>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <StackPanel Spacing="6">
+            <TextBlock Text="Diagnóstico" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock Text="Consulta los logs de la aplicación. Los registros más recientes aparecen primero."
+                       Style="{StaticResource SecondaryTextStyle}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource PanelStyle}">
+            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="12">
+                <ComboBox x:Name="FileComboBox" Header="Archivo de log" PlaceholderText="Sin archivos disponibles"
+                          Style="{StaticResource InputComboBoxStyle}" SelectionChanged="File_SelectionChanged" />
+                <ComboBox x:Name="LevelComboBox" Grid.Column="1" Header="Nivel" MinWidth="150" SelectedIndex="0"
+                          Style="{StaticResource InputComboBoxStyle}" SelectionChanged="Level_SelectionChanged">
+                    <ComboBoxItem Content="Todos los niveles" Tag="All" />
+                    <ComboBoxItem Content="Información" Tag="Info" />
+                    <ComboBoxItem Content="Advertencias" Tag="Warning" />
+                    <ComboBoxItem Content="Errores" Tag="Error" />
+                    <ComboBoxItem Content="Otros / Debug" Tag="Other" />
+                </ComboBox>
+                <Button x:Name="RefreshButton" Grid.Column="2" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Style="{StaticResource PrimaryActionButtonStyle}" Click="Refresh_Click" AutomationProperties.Name="Actualizar logs">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72C;" FontSize="16" />
+                        <TextBlock Text="Actualizar" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="2" Spacing="8">
+            <InfoBar x:Name="DiagnosticInfoBar" IsOpen="False" IsClosable="True" CornerRadius="8" />
+            <ProgressBar x:Name="LoadingProgress" IsIndeterminate="True" Visibility="Collapsed" />
+        </StackPanel>
+
+        <Border Grid.Row="3" Style="{StaticResource PanelStyle}" Padding="12">
+            <Grid>
+                <ListView x:Name="LogsList" SelectionMode="None" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          AutomationProperties.Name="Registros de diagnóstico">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource CardListItemStyle}">
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Message}" />
+                            <Setter Property="MinHeight" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <UserControl Loaded="LogRow_Loaded" DataContextChanged="LogRow_DataContextChanged"
+                                         HorizontalContentAlignment="Stretch" IsTabStop="False">
+                                <Grid Margin="0,0,0,8">
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup>
+                                            <VisualState x:Name="Other" />
+                                            <VisualState x:Name="Info">
+                                                <VisualState.Setters>
+                                                    <Setter Target="RowSurface.Background" Value="{ThemeResource AppAccentSurfaceBrush}" />
+                                                    <Setter Target="RowAccent.Background" Value="{ThemeResource AppAccentTextBrush}" />
+                                                    <Setter Target="LevelText.Foreground" Value="{ThemeResource AppAccentTextBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                            <VisualState x:Name="Warning">
+                                                <VisualState.Setters>
+                                                    <Setter Target="RowSurface.Background" Value="{ThemeResource AppWarningSurfaceBrush}" />
+                                                    <Setter Target="RowAccent.Background" Value="{ThemeResource AppWarningTextBrush}" />
+                                                    <Setter Target="LevelText.Foreground" Value="{ThemeResource AppWarningTextBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                            <VisualState x:Name="Error">
+                                                <VisualState.Setters>
+                                                    <Setter Target="RowSurface.Background" Value="{ThemeResource AppDangerSurfaceBrush}" />
+                                                    <Setter Target="RowAccent.Background" Value="{ThemeResource AppDangerTextBrush}" />
+                                                    <Setter Target="LevelText.Foreground" Value="{ThemeResource AppDangerTextBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <Border x:Name="RowSurface" Background="{ThemeResource AppControlBackgroundBrush}" CornerRadius="8">
+                                        <Grid ColumnDefinitions="4,*">
+                                            <Border x:Name="RowAccent" Background="{ThemeResource AppTextSecondaryBrush}" CornerRadius="8,0,0,8" />
+                                            <StackPanel Grid.Column="1" Margin="12" Spacing="6">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                    <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionTextStyle}" />
+                                                    <TextBlock x:Name="LevelText" Grid.Column="1" Text="{Binding Level}" FontWeight="SemiBold"
+                                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                </Grid>
+                                                <TextBlock Text="{Binding Source}" Style="{StaticResource CaptionTextStyle}" IsTextSelectionEnabled="True" />
+                                                <TextBlock Text="{Binding Message}" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource AppTextPrimaryBrush}" IsTextSelectionEnabled="True" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </UserControl>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <TextBlock x:Name="EmptyText" Text="Todavía no hay logs disponibles." Style="{StaticResource SecondaryTextStyle}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="16" />
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="4" Spacing="4">
+            <TextBlock x:Name="SummaryText" Style="{StaticResource CaptionTextStyle}" />
+            <TextBlock x:Name="LimitText" Style="{StaticResource CaptionTextStyle}" Visibility="Collapsed" />
+            <TextBlock x:Name="UpdatedText" Text="Pulsa Actualizar para cargar nuevos registros." Style="{StaticResource CaptionTextStyle}" />
+        </StackPanel>
+    </Grid>
+</Page>
