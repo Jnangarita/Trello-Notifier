@@ -18,7 +18,6 @@
                         <Setter Target="HeaderActions.(Grid.Column)" Value="0" />
                         <Setter Target="HeaderActions.HorizontalAlignment" Value="Left" />
                         <Setter Target="HeaderActions.Margin" Value="0,12,0,0" />
-                        <Setter Target="RefreshButton.HorizontalAlignment" Value="Left" />
                         <Setter Target="OpenSummary.(Grid.ColumnSpan)" Value="2" />
                         <Setter Target="DueSoonSummary.(Grid.Column)" Value="2" />
                         <Setter Target="DueSoonSummary.(Grid.ColumnSpan)" Value="2" />
@@ -74,13 +73,37 @@
                     <TextBlock x:Name="PageDescription" Text="Tarjetas pendientes y no archivadas asignadas a tu cuenta de Trello." Style="{StaticResource SecondaryTextStyle}" FontSize="16" />
                 </StackPanel>
                 <StackPanel x:Name="HeaderActions" Grid.Column="1" Spacing="8" Margin="16,0,0,0" HorizontalAlignment="Right">
-                    <Button x:Name="RefreshButton" Style="{StaticResource PrimaryActionButtonStyle}"
-                            Click="Refresh_Click" HorizontalAlignment="Right" AutomationProperties.Name="Comprobar ahora">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon Glyph="&#xE72C;" FontSize="18" />
-                            <TextBlock x:Name="RefreshText" Text="Comprobar ahora" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="RefreshButton" Style="{StaticResource ActionButtonStyle}"
+                                Click="Refresh_Click" CornerRadius="12" Padding="12,9" AutomationProperties.Name="Actualizar tarjetas">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                <TextBlock x:Name="RefreshText" Text="Actualizar" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="CreateCardButton" Style="{StaticResource PrimaryActionButtonStyle}"
+                                CornerRadius="12" Padding="12,9" AutomationProperties.Name="Crear tarjeta">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="14" />
+                                <TextBlock Text="Crear tarjeta" />
+                                <FontIcon Glyph="&#xE70D;" FontSize="10" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem Text="Creación manual" Click="CreateManualCard_Click">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE70F;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Text="Creación masiva" Click="CreateBulkCards_Click">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE8A5;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
                     <TextBlock x:Name="LastCheckText" Text="Sin comprobaciones todavía" Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
                 <InfoBar x:Name="MonitorInfoBar" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0"

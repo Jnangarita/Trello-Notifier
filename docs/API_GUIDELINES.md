@@ -20,6 +20,35 @@ cliente de tarjetas; reutilizarlo en UI y monitor.
 | Retries | No hay reintentos HTTP internos/backoff; un próximo ciclo vuelve a consultar si sigue activo |
 | Versionamiento | `/1/` es parte de la ruta existente; no alterar por cambios de documentación |
 
+## Creación manual
+
+`CreateCardPage` reutiliza `TrelloApiClient`; la autenticación, timeout, cancelación,
+serialización y logging son compartidos con las consultas. El cliente usa un envío
+común para GET y POST. Los errores HTTP conservan `StatusCode` sin exponer cuerpos
+ni URLs autenticadas. No hay reintentos automáticos de escrituras.
+
+- `GET /1/members/me/boards?filter=open&fields=name&lists=open`: destinos disponibles.
+- `GET /1/boards/{id}/members?fields=fullName,username`: responsables del tablero.
+- `GET /1/boards/{id}/labels?fields=name,color&limit=1000`: etiquetas del tablero.
+- `POST /1/cards`: formulario URL-encoded con `name`, `desc`, `idList`, `idMembers`,
+  `idLabels` y `due` opcional en ISO 8601 con offset. Requiere permiso de escritura.
+- `POST /1/checklists`: `idCard` y `name`.
+- `POST /1/checklists/{id}/checkItems`: `name`, `checked=false`, `pos=bottom`.
+
+Los miembros y etiquetas se consultan en paralelo al seleccionar un tablero y se
+descartan al cambiarlo. La tarjeta se crea antes de sus checklists; un fallo posterior
+se informa como creación parcial, conservando el enlace de la tarjeta en la vista.
+Un timeout/respuesta inválida del POST inicial se trata como resultado incierto y
+no permite repetir el envío desde el mismo formulario. 400/401/403/404/429 sin una
+tarjeta confirmada permiten corregir y reintentar. No se persisten borradores.
+
+La creación masiva reutiliza estos endpoints de tableros, miembros y tarjetas, sin
+otra implementación HTTP. Envía una tarjeta a la vez, espaciando solicitudes 500 ms,
+y se detiene al primer fallo. Solo las pendientes o rechazadas explícitamente pueden
+reenviarse por acción del usuario; creadas o inciertas no. Detener espera la respuesta
+de la tarjeta en curso para evitar incertidumbre por una cancelación a mitad del POST.
+El CSV no modifica las reglas de recordatorios ni añade peticiones desde los filtros.
+
 La UI de prueba de conexión muestra errores en InfoBar; el monitor los publica
 en `MonitorSnapshot.HasError`. Un fallo de API no debe consumir el historial
 de notificaciones. No agregar un segundo cliente ni retries que multipliquen

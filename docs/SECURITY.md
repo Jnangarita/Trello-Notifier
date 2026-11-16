@@ -1,7 +1,8 @@
 # Seguridad
 
 ## Secretos y configuración
-La app solicita API key y token de lectura de Trello. No incorpora un flujo
+La app solicita API key y token de Trello: lectura para el monitor y lectura/escritura
+para crear tarjetas manualmente o por CSV. No incorpora un flujo
 OAuth propio ni autorización local por roles: Trello determina qué tarjetas
 puede leer la cuenta. Usar mínimo privilegio; revocar tokens comprometidos.
 El ejemplo del README permite tokens sin caducidad, lo cual requiere custodia.
@@ -32,6 +33,13 @@ los archivos auxiliares `.db-journal`, `.db-wal` y `.db-shm`.
   es deuda previa, no una garantía de validación unificada.
 
 ## Información sensible y errores
+
+La importación CSV lee solo el archivo elegido por el usuario, comprueba el límite de
+2 MiB antes de cargarlo y admite hasta 1000 filas. No se registran ruta, contenido ni
+nombres de tarjetas en logs. La exportación escapa comillas/separadores y antepone un
+apóstrofo a celdas que podrían interpretarse como fórmulas. Las descripciones se envían
+como texto Markdown, sin ejecutarse como HTML o código. Los enlaces de resultados y
+de creación manual se limitan a HTTPS de Trello mediante `TrelloCard.TrelloUri`.
 No registrar contraseñas, access tokens, query strings autenticadas, nombres de
 tarjetas privadas ni dumps de configuración. La API usa credenciales en query:
 excluir URL completa en diagnósticos. `AppLog.WriteFailure` usa una lista permitida

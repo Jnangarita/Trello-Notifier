@@ -34,12 +34,13 @@ public sealed partial class DashboardPage : Page
     {
         base.OnNavigatedTo(e);
         Scope = e.Parameter is TrelloCardScope.History ? TrelloCardScope.History : TrelloCardScope.Pending;
+        CreateCardButton.Visibility = Scope == TrelloCardScope.Pending ? Visibility.Visible : Visibility.Collapsed;
         if (Scope == TrelloCardScope.History)
         {
             PageTitle.Text = "Historial";
             PageDescription.Text = "Completadas y archivadas asignadas a ti. Estado actual en Trello.";
             SummaryPanel.Visibility = Visibility.Collapsed;
-            RefreshText.Text = "Actualizar historial";
+            RefreshText.Text = "Actualizar";
             AutomationProperties.SetName(RefreshButton, RefreshText.Text);
             LastCheckText.Text = "Sin consultas todavía";
             StatusFilter.Items.Clear();
@@ -69,6 +70,10 @@ public sealed partial class DashboardPage : Page
     {
         await RefreshCardsAsync();
     }
+
+    private void CreateManualCard_Click(object sender, RoutedEventArgs e) => MainPage.Current?.NavigateToManualCreation();
+
+    private void CreateBulkCards_Click(object sender, RoutedEventArgs e) => MainPage.Current?.NavigateToBulkCreation();
 
     private async Task RefreshCardsAsync()
     {

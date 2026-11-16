@@ -34,6 +34,11 @@ public sealed class TrelloCard
     [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 
+    [JsonIgnore]
+    public Uri? TrelloUri => Uri.TryCreate(Url, UriKind.Absolute, out Uri? uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        (uri.Host == "trello.com" || uri.Host.EndsWith(".trello.com", StringComparison.OrdinalIgnoreCase)) ? uri : null;
+
     public TrelloCardStatus GetStatus(DateTimeOffset now, int notifyBeforeMinutes)
     {
         if (DueComplete) return TrelloCardStatus.Completed;

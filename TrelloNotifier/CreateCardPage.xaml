@@ -1,0 +1,131 @@
+<Page
+    x:Class="TrelloNotifier.CreateCardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Foreground="{ThemeResource AppTextPrimaryBrush}"
+    Loaded="Page_Loaded" Unloaded="Page_Unloaded">
+    <Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="CompactCreation">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="CardContent.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="CardDestination.(Grid.Row)" Value="1" />
+                        <Setter Target="CardDestination.(Grid.Column)" Value="0" />
+                        <Setter Target="CardDestination.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="CreationActions.Orientation" Value="Vertical" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="WideCreation">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1100" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="18" MaxWidth="1100" Padding="0,0,12,24">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Crear tarjeta" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock Text="Define el contenido, el destino y los responsables de tu tarjeta."
+                               Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+                <InfoBar x:Name="CreationInfoBar" IsOpen="False" IsClosable="True" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <ProgressRing x:Name="LoadingRing" Width="24" Height="24" IsActive="True" />
+                    <TextBlock x:Name="LoadingText" Text="Cargando tableros..." VerticalAlignment="Center"
+                               Style="{StaticResource SecondaryTextStyle}" />
+                    <Button x:Name="RetryLoadButton" Content="Volver a cargar" Visibility="Collapsed"
+                            Click="RetryLoad_Click" Style="{StaticResource ActionButtonStyle}" />
+                </StackPanel>
+                <UserControl x:Name="CardForm" IsEnabled="False" IsTabStop="False">
+                <Grid ColumnDefinitions="1.5*,*" RowDefinitions="Auto,Auto" ColumnSpacing="18" RowSpacing="18">
+                    <StackPanel x:Name="CardContent" Spacing="18">
+                        <Border Style="{StaticResource PanelStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBox x:Name="TitleTextBox" Header="Título de la tarjeta *" PlaceholderText="¿Qué hay que hacer?"
+                                         Style="{StaticResource InputTextBoxStyle}" />
+                                <TextBlock Text="Descripción" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Content="B" FontWeight="Bold" Tag="**" Click="FormatDescription_Click"
+                                            Style="{StaticResource ActionButtonStyle}" AutomationProperties.Name="Negrita" ToolTipService.ToolTip="Negrita" />
+                                    <Button Content="I" FontStyle="Italic" Tag="*" Click="FormatDescription_Click"
+                                            Style="{StaticResource ActionButtonStyle}" AutomationProperties.Name="Cursiva" ToolTipService.ToolTip="Cursiva" />
+                                    <Button Content="• Lista" Tag="- " Click="FormatDescription_Click" Style="{StaticResource ActionButtonStyle}" />
+                                </StackPanel>
+                                <TextBox x:Name="DescriptionTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="180"
+                                         PlaceholderText="Añade instrucciones, enlaces o detalles..." AutomationProperties.Name="Descripción"
+                                         Style="{StaticResource InputTextBoxStyle}" />
+                                <TextBlock Text="Admite Markdown: **negrita**, *cursiva* y listas. El formato se mostrará en Trello."
+                                           Style="{StaticResource CaptionTextStyle}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource PanelStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Checklists" Style="{StaticResource SectionTitleStyle}" />
+                                <ItemsControl x:Name="ChecklistsEditor">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Spacing="8" Margin="0,0,0,16">
+                                                <TextBox Header="Nombre del checklist" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         Style="{StaticResource InputTextBoxStyle}" />
+                                                <TextBox Header="Elementos (uno por línea)" MinHeight="100" AcceptsReturn="True" TextWrapping="Wrap"
+                                                         Text="{Binding ItemsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         Style="{StaticResource InputTextBoxStyle}" />
+                                                <Button Content="Eliminar checklist" Tag="{Binding}" Click="RemoveChecklist_Click"
+                                                        Style="{StaticResource ActionButtonStyle}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Content="+ Añadir checklist" Click="AddChecklist_Click" Style="{StaticResource ActionButtonStyle}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    <Border x:Name="CardDestination" Grid.Column="1" Style="{StaticResource PanelStyle}" VerticalAlignment="Top">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Destino y organización" Style="{StaticResource SectionTitleStyle}" />
+                            <ComboBox x:Name="BoardComboBox" Header="Tablero *" PlaceholderText="Selecciona un tablero"
+                                      DisplayMemberPath="Name" SelectionChanged="Board_SelectionChanged" Style="{StaticResource InputComboBoxStyle}" />
+                            <UserControl x:Name="BoardDetails" IsEnabled="False" IsTabStop="False">
+                            <StackPanel Spacing="14">
+                                <ComboBox x:Name="ListComboBox" Header="Lista *" PlaceholderText="Selecciona una lista"
+                                          DisplayMemberPath="Name" Style="{StaticResource InputComboBoxStyle}" />
+                                <TextBlock Text="Responsables" FontWeight="SemiBold" />
+                                <ListView x:Name="MembersList" SelectionMode="Multiple" MaxHeight="160" DisplayMemberPath="DisplayName"
+                                          AutomationProperties.Name="Responsables de la tarjeta" />
+                                <TextBlock x:Name="MembersHelp" Text="Selecciona uno o varios miembros del tablero."
+                                           Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock Text="Etiquetas" FontWeight="SemiBold" />
+                                <ListView x:Name="LabelsList" SelectionMode="Multiple" MaxHeight="130" DisplayMemberPath="DisplayName"
+                                          AutomationProperties.Name="Etiquetas de la tarjeta" />
+                                <TextBlock x:Name="LabelsHelp" Style="{StaticResource CaptionTextStyle}" />
+                            </StackPanel>
+                            </UserControl>
+                            <CalendarDatePicker x:Name="DueDatePicker" Header="Fecha de vencimiento" PlaceholderText="Sin vencimiento"
+                                                HorizontalAlignment="Stretch" />
+                            <TimePicker x:Name="DueTimePicker" Header="Hora de vencimiento" ClockIdentifier="24HourClock"
+                                        HorizontalAlignment="Stretch" />
+                            <Button Content="Quitar vencimiento" Click="ClearDueDate_Click" Style="{StaticResource ActionButtonStyle}" />
+                            <TextBlock Text="La fecha es opcional y usa la hora local de Windows. Para recibir recordatorios, asígnate la tarjeta y añade un vencimiento."
+                                       Style="{StaticResource CaptionTextStyle}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                </UserControl>
+                <TextBlock Text="* Campos obligatorios. Crear tarjetas requiere un token de Trello con permiso de escritura."
+                           Style="{StaticResource CaptionTextStyle}" />
+                <StackPanel x:Name="CreationActions" Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="CreateButton" Content="Crear tarjeta" IsEnabled="False" Click="Create_Click"
+                            Style="{StaticResource PrimaryActionButtonStyle}" />
+                    <Button x:Name="BackButton" Content="Volver a Mis tarjetas" Click="Back_Click" Style="{StaticResource ActionButtonStyle}" />
+                    <Button x:Name="OpenCreatedButton" Content="Abrir en Trello" Visibility="Collapsed"
+                            Click="OpenCreated_Click" Style="{StaticResource ActionButtonStyle}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

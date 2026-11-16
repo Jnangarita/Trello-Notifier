@@ -11,6 +11,9 @@ public partial class App : Application
 {
     private Window? _mainWindow;
 
+    internal IntPtr WindowHandle => WinRT.Interop.WindowNative.GetWindowHandle(
+        _mainWindow ?? throw new InvalidOperationException("La ventana principal todavía no está disponible."));
+
     public App()
     {
         AppLog.Initialize(debug: string.Equals(

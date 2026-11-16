@@ -104,7 +104,7 @@
                             <ComboBoxItem Content="60 minutos" Tag="60" />
                         </ComboBox>
                     </Grid>
-                    <TextBlock Text="El primer aviso se envía al detectar la tarjeta. Las repeticiones se envían en la primera comprobación tras cumplirse el intervalo, también al pulsar Comprobar ahora."
+                    <TextBlock Text="El primer aviso se envía al detectar la tarjeta. Las repeticiones se envían en la primera comprobación tras cumplirse el intervalo, también al pulsar Actualizar tarjetas."
                                Style="{StaticResource CaptionTextStyle}" />
                     <Border BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                         <StackPanel Spacing="10">

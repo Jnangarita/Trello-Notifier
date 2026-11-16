@@ -53,11 +53,17 @@ El enlace `https://trello.com/app-key` puede dirigirte a ese panel. La sección 
    https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&name=Trello%20Notifier&key=TU_API_KEY
    ```
 
+   ```text
+   https://trello.com/1/authorize?expiration=never&scope=read,write,account&response_type=token&key=TU_API_KEY
+   ```
+
 2. Abre la URL completa en el navegador con tu sesión de Trello iniciada.
 3. Comprueba que estás autorizando la cuenta correcta y pulsa **Permitir / Allow**.
 4. Copia el **token** que Trello muestra al finalizar.
 
 El parámetro `scope=read` solicita el permiso de lectura que necesita la aplicación. `expiration=never` indica que el token no caduca automáticamente; puedes revocarlo desde la configuración de tu cuenta de Trello, en **Aplicaciones**.
+
+Para usar **Creación manual** o **Creación masiva**, autoriza un token con `scope=read,write` en esa URL y guárdalo en Configuración. Los tokens de solo lectura siguen sirviendo para consultar tarjetas y recibir avisos, pero no permiten crearlas. La cuenta también debe poder escribir en el tablero de destino.
 
 ### 3. Introducir los datos en Trello Notifier
 
@@ -81,7 +87,7 @@ Si aparece **Conexión correcta. El servidor devolvió 0 tarjeta(s) abierta(s).*
 
 1. En **Configuración**, pulsa **Probar notificación** para comprobar que Windows muestra el aviso.
 2. En Trello, elige una tarjeta abierta asignada a ti y establece una fecha y hora de vencimiento dentro de los próximos **60 minutos**, si mantienes la anticipación predeterminada. Deja el vencimiento sin marcar como completado.
-3. En Trello Notifier, abre **Mis tarjetas** y pulsa **Comprobar ahora**.
+3. En Trello Notifier, abre **Mis tarjetas** y pulsa **Actualizar**.
 4. Mantén la aplicación en ejecución para recibir los avisos. Por defecto consulta Trello cada **5 minutos**.
 
 La aplicación avisa de tarjetas próximas a vencer y, opcionalmente, de vencidas pendientes; no replica las notificaciones de comentarios o menciones de Trello.
@@ -167,7 +173,7 @@ Esta prueba no realiza solicitudes de red y no necesita API key ni token.
 5. Crea el Mock Server y copia su URL, con un formato similar a `https://abc123.mock.pstmn.io`.
 6. Para usar el mock, la configuración persistida debe tener previamente esa URL en `ApiBaseUrl`; este valor es de solo lectura en la interfaz. No agregues `/1/members/me/cards` al final.
 7. Deja vacíos **API key** y **Token**, pulsa **Probar conexión** y después **Guardar cambios**.
-8. Regresa a **Mis tarjetas** y pulsa **Comprobar ahora**.
+8. Regresa a **Mis tarjetas** y pulsa **Actualizar**.
 
 La aplicación añadirá automáticamente la ruta `/1/members/me/cards` y los parámetros de consulta. Para volver al servicio real, restaura la URL `https://api.trello.com` en la configuración persistida e introduce las credenciales de Trello en la interfaz.
 
@@ -227,6 +233,48 @@ Se guarda la fecha y hora del último aviso enviado por cada combinación de tar
 Al actualizar desde una versión anterior, la repetición predeterminada es de 30 minutos. El historial antiguo se migra automáticamente: las tarjetas que ya figuraban como notificadas comienzan a contar su intervalo desde la migración, para evitar una ráfaga inmediata de avisos. Puedes seleccionar **Nunca** para mantener el comportamiento de un solo aviso.
 
 ### Consultar y filtrar tarjetas
+
+En **Mis tarjetas**, **Actualizar** consulta las tarjetas y **Crear tarjeta** despliega las opciones **Creación manual** y **Creación masiva**.
+
+### Creación manual
+
+1. Pulsa **Crear tarjeta → Creación manual**. Se cargan los tableros abiertos y sus listas abiertas desde Trello.
+2. Escribe el **título** y selecciona **tablero y lista**. Son obligatorios.
+3. Opcionalmente, añade una descripción en Markdown; los botones de negrita, cursiva y lista insertan ese formato. Selecciona uno o varios responsables y etiquetas del tablero.
+4. Puedes añadir vencimiento (fecha y hora local de Windows) y varios checklists, con un elemento por línea. Las líneas vacías se omiten. **Quitar vencimiento** permite crear la tarjeta sin fecha.
+5. Pulsa **Crear tarjeta**. Se crea primero la tarjeta y luego sus checklists. Al terminar puedes abrirla en Trello o volver a Mis tarjetas, que actualizará la consulta. Solo aparecerá allí si está asignada a tu cuenta.
+
+El formulario conserva lo escrito ante un rechazo explícito de Trello y permite reintentar. Si se creó la tarjeta pero falló un checklist, se informa del resultado parcial y se completa desde Trello. Si no se puede confirmar el resultado de un envío, se bloquea un segundo envío de ese formulario: revisa el tablero antes de iniciar otra creación. No hay reintentos automáticos ni almacenamiento local de borradores; salir de la vista descarta el formulario. Durante el envío se espera a que termine antes de cambiar de vista.
+
+### Creación masiva desde CSV
+
+1. Abre **Crear tarjeta → Creación masiva** y descarga la plantilla si la necesitas.
+2. Arrastra un archivo a la zona CSV o pulsa **Elegir archivo** para seleccionar un CSV **UTF-8**, de hasta **2 MiB y 1000 tarjetas**. Admite separadores coma o punto y coma, campos entre comillas, comillas escapadas y descripciones multilínea.
+3. Selecciona un **tablero**, una **lista** y, opcionalmente, varios **responsables predeterminados** para el lote.
+4. Pulsa **Revisar tarjetas**. Se muestran título, descripción, vencimiento en hora local, responsables y errores por fila. Corrige el CSV y vuelve a cargarlo, o marca **Excluir las filas con errores**.
+5. Pulsa **Crear tarjetas**. Los envíos son secuenciales, con una pausa de 500 ms entre solicitudes. Puedes **Detener después de esta tarjeta** y continuar después, sin repetir las ya creadas.
+6. Consulta el resumen de creadas, pendientes y excluidas, descarga los resultados o abre las tarjetas creadas en Trello. El CSV de resultados incluye fila, título, estado, ID, URL y detalle, con protección frente a fórmulas de hoja de cálculo. **Nueva importación** permite iniciar otro lote.
+
+Columnas admitidas (no se aceptan columnas adicionales ni repetidas):
+
+| Columna | Uso |
+| --- | --- |
+| `titulo` | Obligatoria; no se aceptan títulos vacíos. |
+| `descripcion` | Opcional; admite Markdown y saltos de línea en campos entre comillas. |
+| `vencimiento` | Opcional; ISO 8601 con zona explícita, por ejemplo `2026-12-05T09:00:00-05:00` o `2026-12-05T14:00:00Z`. |
+| `responsables` | Opcional; nombres de usuario del tablero separados por `;`, con o sin `@`. Si está vacía, se usan los responsables predeterminados. |
+
+```csv
+titulo,descripcion,vencimiento,responsables
+Revisar inventario,**Importante:** validar existencias,2026-12-05T09:00:00-05:00,ana;carlos
+Enviar informe,Resumen semanal,,
+```
+
+El lote se detiene ante un error. **Continuar / reintentar** solo envía filas pendientes o rechazadas explícitamente (400/401/403/404/429); espera y corrige permisos/destino según corresponda antes de reintentar. Las creadas, excluidas y de resultado incierto no se reenvían. Un timeout o respuesta inválida puede significar que Trello sí creó la tarjeta: revisa el tablero antes de iniciar otra importación de esa fila.
+
+El progreso se conserva únicamente mientras permanezcas en la vista: descarga los resultados antes de salir. Los checklists y las etiquetas se configuran en la creación manual o directamente en Trello; no son columnas de este formato CSV.
+
+### Consulta de tarjetas
 
 Abre **Mis tarjetas**. Por defecto se muestran **Todas las pendientes** asignadas a tu cuenta: tarjetas sin completar y no archivadas. Usa el filtro **Estado**:
 

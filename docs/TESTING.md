@@ -94,6 +94,29 @@ El control de imports se aplica también a `MainPage.xaml.cs`; su excepción
 anterior se retiró al modificar la carga de preferencias para SQLite.
 
 ## Comprobación manual cuando cambie UI
+
+En **Creación masiva**, usar un CSV de ejemplo sin datos privados y un mock local:
+elegir/cancelar archivos, arrastrar un único CSV (rechazar varios archivos o carpetas),
+guardar plantilla/resultados, probar UTF-8 con BOM, comillas,
+saltos de línea, fechas con offset, responsables desconocidos y cambio rápido de tablero.
+Comprobar revisión/exclusión de inválidas, progreso, doble clic, detener/continuar,
+rechazo 403/429 y respuesta incierta. Los reintentos no deben reenviar creadas/excluidas/
+inciertas; navegar durante el envío requiere detener primero. El runner enlaza el parser
+real (sin UI ni HTTP) y cubre formatos, límites, validación de usuarios/fechas, estados,
+enlaces seguros y escape/protección de exportación.
+Revisar los tres pasos (archivo y destino, revisión, resultado), los colores de las
+filas al desplazarlas, el resumen final y Nueva importación en temas claro/oscuro
+y ventanas amplias/estrechas, comparándolos con los mockups de creación masiva.
+
+En **Crear tarjeta → Creación manual**, usar un servidor simulado y credenciales
+ficticias para comprobar carga vacía/fallida, cambio rápido de tablero, selección
+múltiple de miembros/etiquetas, título/lista obligatorios, fecha opcional, Markdown y
+varios checklists con líneas vacías. Comprobar un POST de tarjeta seguido de sus
+checklists, doble clic, rechazo 403/429, timeout con resultado incierto y fallo parcial
+tras crear la tarjeta. La vista debe impedir reenvíos inciertos y abrir solo enlaces
+HTTPS de Trello. Revisar adaptación a ventana estrecha y navegación durante el envío.
+El runner cubre validación de borradores, elementos de checklist y DTOs de selección;
+no enlaza el cliente HTTP real ni automatiza WinUI.
 Abrir en Windows, navegar dashboard/configuración, guardar y comprobar temas,
 usar **Probar notificación** sin red. Para integración HTTP usar un mock con
 valores ficticios siguiendo el README; comprobar refresco y errores. Revisar

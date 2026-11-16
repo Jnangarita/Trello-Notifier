@@ -49,8 +49,7 @@ public sealed partial class MainPage : Page
     {
         if (args.IsSettingsInvoked)
         {
-            ContentFrame.Navigate(typeof(SettingsPage));
-            Navigation.Header = "Configuración";
+            if (ContentFrame.Navigate(typeof(SettingsPage))) Navigation.Header = "Configuración";
             return;
         }
 
@@ -58,11 +57,21 @@ public sealed partial class MainPage : Page
             ? TrelloCardScope.History : TrelloCardScope.Pending);
     }
 
-    private void NavigateToCards(TrelloCardScope scope)
+    internal void NavigateToManualCreation()
+    {
+        if (ContentFrame.Navigate(typeof(CreateCardPage))) Navigation.Header = "Crear tarjeta";
+    }
+
+    internal void NavigateToBulkCreation()
+    {
+        if (ContentFrame.Navigate(typeof(BulkCreateCardPage))) Navigation.Header = "Crear tarjetas en lote";
+    }
+
+    internal void NavigateToCards(TrelloCardScope scope)
     {
         if (ContentFrame.Content is not DashboardPage page || page.Scope != scope)
         {
-            ContentFrame.Navigate(typeof(DashboardPage), scope);
+            if (!ContentFrame.Navigate(typeof(DashboardPage), scope)) return;
         }
 
         Navigation.Header = scope == TrelloCardScope.History ? "Historial" : "Trello Notifier";

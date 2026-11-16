@@ -26,6 +26,14 @@ para Historial (completadas o archivadas, consulta bajo demanda sin avisos);
 ambas vistas usan paginación local de 10/25/50 filas (25 por defecto), posterior a
 los filtros mediante `MonitorSnapshot.GetCardPage`, sin nuevas consultas ni avisos.
 `SettingsPage` valida y guarda preferencias.
+`CreateCardPage` crea tarjetas manuales con Markdown, responsables, etiquetas, fecha
+y checklists usando el cliente compartido. Valida borradores en modelos; conserva
+resultados parciales en la vista y evita reenvíos tras una respuesta incierta. Los
+destinos se consultan bajo demanda; no hay borradores persistentes.
+`BulkCreateCardPage` importa CSV UTF-8 (hasta 2 MiB / 1000 filas), revisa y crea por
+lotes secuenciales con el mismo cliente. `CardCsvImporter` reutiliza TextFieldParser
+de .NET, valida fechas/usuarios y exporta resultados; `CardImportRow` guarda estados
+en memoria para no reenviar creadas o inciertas. Se puede detener entre solicitudes.
 `Styles.xaml` contiene los estilos compartidos.
 
 `Models/` contiene `AppSettings`, `TrelloCard` (también DTO JSON; `closed` es

@@ -10,6 +10,145 @@ using TrelloNotifier.Tests;
 DateTimeOffset now = new(2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
 int passed = 0;
 
+await Run("CSV admite BOM, comillas escapadas, Markdown y descripciones multilínea", () =>
+{
+    string csv = "\uFEFFtitulo,descripcion,vencimiento,responsables\r\n\"Revisar, pedido\",\"**Importante**: \"\"urgente\"\"\r\nlínea 2\",2026-12-05T09:00:00-05:00,ana;@carlos\r\n";
+    List<CardImportRow> rows = CardCsvImporter.Parse(csv, CancellationToken.None);
+    Check(rows.Count == 1 && rows[0].RowNumber == 1 && rows[0].Draft.Name == "Revisar, pedido", "Una fila lógica por tarjeta.");
+    Check(rows[0].Draft.Description.Replace("\r\n", "\n") == "**Importante**: \"urgente\"\nlínea 2", "Conservar contenido y formato.");
+    Check(rows[0].Draft.Due == new DateTimeOffset(2026, 12, 5, 9, 0, 0, TimeSpan.FromHours(-5)), "Conservar el instante con offset.");
+    Check(rows[0].RequestedMembers == "ana;@carlos", "Conservar responsables por fila.");
+    rows = CardCsvImporter.Parse("titulo;descripcion\nEntrega;\"Revisar; enviar\"\n", CancellationToken.None);
+    Check(rows[0].Draft.Description == "Revisar; enviar" && rows[0].Draft.Due is null, "Separador de Excel y campos opcionales.");
+    return Task.CompletedTask;
+});
+
+await Run("CSV rechaza estructura incorrecta y limita tamaño y cantidad", () =>
+{
+    string[] invalid =
+    {
+        "", "titulo\n", "descripcion\nTexto", "titulo,titulo\nA,B", "titulo,extra\nA,B",
+        "titulo\n\"sin cierre", new string('a', CardCsvImporter.MaxFileBytes + 1),
+        "titulo\n" + string.Concat(Enumerable.Repeat("Tarjeta\n", CardCsvImporter.MaxRows + 1))
+    };
+    foreach (string csv in invalid)
+    {
+        bool rejected = false;
+        try { CardCsvImporter.Parse(csv, CancellationToken.None); }
+        catch (FormatException) { rejected = true; }
+        Check(rejected, "Rechazar archivos inválidos sin crear filas parciales.");
+    }
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+    bool cancelled = false;
+    try { CardCsvImporter.Parse("titulo\nTarjeta", cancellation.Token); }
+    catch (OperationCanceledException) { cancelled = true; }
+    Check(cancelled, "Permitir cancelar el procesamiento.");
+    return Task.CompletedTask;
+});
+
+await Run("CSV valida vencimientos con zona y errores de columnas por fila", () =>
+{
+    List<CardImportRow> rows = CardCsvImporter.Parse(
+        "titulo,vencimiento\nSin fecha,\nUTC,2026-12-05T14:00:00Z\nLocal,2026-12-05T14:00:00\nInválida,2026-02-30T09:00:00-05:00\nExtra,,dato", CancellationToken.None);
+    Check(rows[0].Draft.Due is null && rows[0].ParseError is null, "Admitir fecha vacía.");
+    Check(rows[1].Draft.Due == new DateTimeOffset(2026, 12, 5, 14, 0, 0, TimeSpan.Zero), "Admitir UTC explícito.");
+    Check(rows.Skip(2).All(row => row.ParseError is not null), "Rechazar fechas ambiguas, inexistentes y exceso de columnas.");
+    return Task.CompletedTask;
+});
+
+await Run("Importación combina responsables por fila y predeterminados sin asignaciones silenciosas", () =>
+{
+    var members = new[]
+    {
+        new TrelloMember { Id = "a", Username = "ana", FullName = "Ana" },
+        new TrelloMember { Id = "b", Username = "carlos", FullName = "Carlos" }
+    };
+    List<CardImportRow> source = CardCsvImporter.Parse(
+        "titulo,responsables\nComún,\nPropios,@ANA;carlos;ana\nDesconocido,nadie\nSolo símbolo,@\n ,ana", CancellationToken.None);
+    List<CardImportRow> rows = CardCsvImporter.Prepare(source, "lista", members, new[] { "b" });
+    Check(rows[0].Draft.MemberIds.SequenceEqual(new[] { "b" }), "Aplicar predeterminados a celdas vacías.");
+    Check(rows[1].Draft.MemberIds.SequenceEqual(new[] { "a", "b" }), "Los responsables de la fila prevalecen y no se duplican.");
+    Check(rows.Take(2).All(row => row.State == CardImportState.Ready && row.Draft.ListId == "lista"), "Preparar válidas para el destino elegido.");
+    Check(rows.Skip(2).All(row => row.State == CardImportState.Invalid), "Exigir usuarios reconocidos y título útil.");
+    Check(source[0].Draft.ListId == "" && source[0].Draft.MemberIds.Count == 0, "Revisar no debe mutar el archivo de origen.");
+    Check(CardCsvImporter.Prepare(source.Take(1), "lista", members, new[] { "ausente" })[0].State == CardImportState.Invalid,
+        "No omitir silenciosamente un responsable predeterminado ausente.");
+    Check(CardCsvImporter.Prepare(source.Take(1), "", members, Array.Empty<string>())[0].State == CardImportState.Invalid,
+        "Reutilizar la validación de destino del borrador.");
+    return Task.CompletedTask;
+});
+
+await Run("Resultados de importación evitan reenvíos y exportan texto seguro", () =>
+{
+    foreach (CardImportState state in Enum.GetValues<CardImportState>())
+    {
+        Check(new CardImportRow { State = state }.CanSubmit == (state is CardImportState.Ready or CardImportState.Rejected),
+            "Solo reenviar pendientes o rechazos confirmados.");
+    }
+    var row = new CardImportRow
+    {
+        RowNumber = 1, Draft = new TrelloCardDraft { Name = " =HYPERLINK(\"ejemplo\")" }, State = CardImportState.Created,
+        CreatedCard = new TrelloCard { Id = "creada", Url = "https://trello.com/c/ejemplo" }, Message = "Creada, correctamente"
+    };
+    string csv = CardCsvImporter.ExportResults(new[] { row });
+    Check(csv.Contains("\"' =HYPERLINK(\"\"ejemplo\"\")\"") && csv.Contains("\"Creada, correctamente\""),
+        "Neutralizar fórmulas y escapar comillas y separadores.");
+    Check(csv.Contains("https://trello.com/c/ejemplo") && row.CanOpen, "Conservar ID y enlace seguro de la tarjeta.");
+    foreach (string url in new[] { "http://trello.com/c/x", "https://trello.com.ejemplo.invalid/c/x", "file:///C:/dato", "javascript:alert(1)" })
+        Check(new TrelloCard { Url = url }.TrelloUri is null, "No abrir esquemas ni hosts ajenos a Trello.");
+    return Task.CompletedTask;
+});
+
+await Run("Creación manual exige título y lista y admite campos opcionales vacíos", () =>
+{
+    var draft = new TrelloCardDraft();
+    Check(draft.GetValidationError() is not null, "Rechazar un formulario vacío.");
+    draft.Name = "Nueva tarjeta";
+    Check(draft.GetValidationError() is not null, "Exigir lista de destino.");
+    draft.ListId = "lista-ejemplo";
+    Check(draft.GetValidationError() is null, "Permitir tarjeta sin fecha, responsables, etiquetas ni checklists.");
+    draft.Name = " \t ";
+    Check(draft.GetValidationError() is not null, "No aceptar un título de espacios.");
+    return Task.CompletedTask;
+});
+
+await Run("Checklists manuales conservan orden y omiten líneas vacías", () =>
+{
+    var checklist = new TrelloChecklistDraft
+    {
+        Name = "Antes de enviar",
+        ItemsText = "  Revisar productos  \r\n\r\n Confirmar dirección\n \t \nAdjuntar factura\rÚltima revisión"
+    };
+    Check(checklist.GetItems().SequenceEqual(new[] { "Revisar productos", "Confirmar dirección", "Adjuntar factura", "Última revisión" }),
+        "Respetar el orden y admitir saltos de línea de Windows y otros sistemas.");
+    var draft = new TrelloCardDraft { Name = "Entrega", ListId = "lista", Checklists = new() { checklist } };
+    Check(draft.GetValidationError() is null, "Aceptar el checklist completo.");
+    checklist.Name = " ";
+    Check(draft.GetValidationError() is not null, "Exigir nombre del checklist.");
+    checklist.Name = "Revisión";
+    checklist.ItemsText = "\r\n \t ";
+    Check(draft.GetValidationError() is not null, "Rechazar un checklist sin elementos útiles.");
+    return Task.CompletedTask;
+});
+
+await Run("Miembros y etiquetas de Trello muestran nombres y alternativas", () =>
+{
+    TrelloMember member = JsonSerializer.Deserialize<TrelloMember>("{\"id\":\"miembro\",\"fullName\":\"Ana\",\"username\":\"ana.ejemplo\"}")!;
+    Check(member.DisplayName == "Ana (@ana.ejemplo)", "Distinguir miembros con nombres iguales por usuario.");
+    member.FullName = "";
+    Check(member.DisplayName == "@ana.ejemplo", "Usar el usuario cuando falta el nombre.");
+    member.Username = "";
+    Check(member.DisplayName == "miembro", "Usar el ID si falta información de presentación.");
+    TrelloLabel label = JsonSerializer.Deserialize<TrelloLabel>("{\"id\":\"etiqueta\",\"name\":\"Urgente\",\"color\":\"red\"}")!;
+    Check(label.DisplayName == "Urgente", "Mostrar el nombre de la etiqueta.");
+    label.Name = "";
+    Check(label.DisplayName == "Etiqueta red", "Las etiquetas sin nombre se distinguen por color.");
+    label.Color = null;
+    Check(label.DisplayName == "Etiqueta sin nombre", "Admitir etiquetas sin color ni nombre.");
+    return Task.CompletedTask;
+});
+
 await Run("Ventana de aviso, límites y tarjetas completadas", () =>
 {
     TrelloCard[] cards =

@@ -7,6 +7,8 @@ Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework
 
 ```text
 App → MainWindow / MainPage → DashboardPage / SettingsPage
+MainPage → CreateCardPage → SettingsStore / TrelloApiClient
+MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
 App / páginas → AppServices (composición de instancias concretas)
 DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
 DashboardPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
@@ -40,6 +42,22 @@ al salir y no persiste tarjetas. Ambas vistas reutilizan filas, estilos y
 `TrelloCardViewModel`; las archivadas muestran su condición de completado sin
 urgencia temporal. El monitor actualiza controles mediante `DispatcherQueue`.
 La UI contiene coordinación en code-behind.
+
+`CreateCardPage` implementa el formulario manual, reutiliza estilos y el cliente HTTP
+compartido, y coordina la creación de tarjeta, checklists y elementos. Los borradores
+`TrelloCardDraft`/`TrelloChecklistDraft` validan campos y normalizan líneas sin IO;
+`TrelloMember` y `TrelloLabel` representan las opciones de Trello. Las cargas se cancelan
+al navegar o cambiar de tablero; durante una escritura se impide navegar para conservar
+su resultado. Los fallos parciales o inciertos se muestran sin repetir el POST inicial.
+
+`BulkCreateCardPage` coordina selector de archivos WinUI, destino, revisión y envío
+secuencial. `CardCsvImporter` procesa texto con `TextFieldParser` de .NET, prepara los
+`TrelloCardDraft` reutilizando su validación y exporta resultados con escape CSV y
+protección contra fórmulas. `CardImportRow`/`CardImportState` representan filas y sus
+estados sin depender de UI, archivos o HTTP. El progreso es local a la vista; se
+exporta a un archivo elegido por el usuario. El HWND del selector procede de `App`.
+La clasificación de rechazos confirmados pertenece a `TrelloApiClient` y se comparte
+con la creación manual; `TrelloCard.TrelloUri` centraliza sus enlaces HTTPS seguros.
 
 `App` inicializa `Services/AppLog` antes de usar `AppServices` y vacía Serilog al
 cerrar o ante un fallo fatal. Los servicios y las fronteras de UI usan el logger
