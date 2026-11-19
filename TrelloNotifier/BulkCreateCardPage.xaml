@@ -80,7 +80,7 @@
                     <Border Width="30" Height="30" CornerRadius="15" Background="{ThemeResource AppBrandBrush}">
                         <TextBlock Text="1" Foreground="{ThemeResource AppBrandTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Grid.Column="1" Text="Archivo y destino" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="Origen y destino" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </Grid>
                 <Border x:Name="StepConnectorOne" Grid.Column="1" Width="64" Height="1" Background="{ThemeResource AppPanelBorderBrush}" />
                 <Grid Grid.Column="2" ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -103,6 +103,7 @@
             <InfoBar x:Name="ImportInfoBar" IsOpen="False" IsClosable="True" CornerRadius="8" />
             <TextBlock x:Name="ProgressText" Style="{StaticResource CaptionTextStyle}" Visibility="Collapsed" />
             <ProgressBar x:Name="ImportProgress" IsIndeterminate="True" Visibility="Collapsed" />
+            <Button x:Name="CancelGeminiButton" Content="Cancelar generación" Click="CancelGemini_Click" Visibility="Collapsed" Style="{StaticResource ActionButtonStyle}" />
         </StackPanel>
 
         <Grid Grid.Row="3">
@@ -146,7 +147,12 @@
                         </Border>
                         <Border x:Name="FilePanel" Grid.Row="1" Style="{StaticResource PanelStyle}">
                             <StackPanel Spacing="16">
-                                <TextBlock Text="1. Selecciona tu archivo" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="1. Origen de las tarjetas" Style="{StaticResource SectionTitleStyle}" />
+                                <ComboBox x:Name="SourceComboBox" Header="Origen" SelectedIndex="0" SelectionChanged="Source_SelectionChanged" Style="{StaticResource InputComboBoxStyle}">
+                                    <ComboBoxItem Content="Archivo CSV" />
+                                    <ComboBoxItem Content="Texto con IA" />
+                                </ComboBox>
+                                <StackPanel x:Name="CsvInputPanel" Spacing="12">
                                 <TextBlock Text="Una fila por tarjeta. Puedes preparar el archivo en Excel." Style="{StaticResource SecondaryTextStyle}" />
                                 <Grid AllowDrop="True" DragOver="Csv_DragOver" Drop="Csv_Drop" MinHeight="198">
                                     <Rectangle Fill="{ThemeResource AppAccentSurfaceBrush}" Opacity="0.35" RadiusX="10" RadiusY="10" />
@@ -160,18 +166,24 @@
                                         <Button Content="Elegir archivo" HorizontalAlignment="Center" Click="ChooseFile_Click" Style="{StaticResource ActionButtonStyle}" />
                                     </StackPanel>
                                 </Grid>
+                                </StackPanel>
+                                <StackPanel x:Name="GeminiInputPanel" Spacing="12" Visibility="Collapsed">
+                                    <TextBlock Text="El texto se envía a Google Gemini. Hasta 20 000 caracteres y 50 propuestas. Revisa las fechas; los responsables se eligen en la app. Este origen genera título, descripción y vencimiento, sin checklists ni etiquetas." Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBox x:Name="GeminiPromptTextBox" Header="Pega tus pendientes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="150" MaxHeight="260" MaxLength="20000" Style="{StaticResource InputTextBoxStyle}" />
+                                    <TextBlock Text="Una generación correcta reemplaza el origen cargado. Si falla o se cancela, se conserva el anterior." Style="{StaticResource CaptionTextStyle}" />
+                                    <Button x:Name="GenerateGeminiButton" Content="Generar tareas" Click="GenerateGemini_Click" Style="{StaticResource PrimaryActionButtonStyle}" />
+                                </StackPanel>
                                 <Border x:Name="SelectedFilePanel" CornerRadius="8" Padding="14" Background="{ThemeResource AppPageBackgroundBrush}"
                                         BorderBrush="{ThemeResource AppPanelBorderBrush}" BorderThickness="1" Visibility="Collapsed">
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                        <Border Style="{StaticResource AccentBadgeStyle}" VerticalAlignment="Center"><TextBlock Text="CSV" Foreground="{ThemeResource AppAccentTextBrush}" FontSize="12" /></Border>
+                                        <Border Style="{StaticResource AccentBadgeStyle}" VerticalAlignment="Center"><TextBlock Text="✓" Foreground="{ThemeResource AppAccentTextBrush}" FontSize="12" /></Border>
                                         <StackPanel Grid.Column="1" Spacing="4">
                                             <TextBlock x:Name="SelectedFileName" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                             <TextBlock x:Name="FileSummary" Style="{StaticResource CaptionTextStyle}" />
                                         </StackPanel>
-                                        <HyperlinkButton Grid.Column="2" Content="Cambiar" Click="ChooseFile_Click" VerticalAlignment="Center" Padding="0" />
                                     </Grid>
                                 </Border>
-                                <TextBlock Text="CSV UTF-8 · Hasta 1000 tarjetas / 2 MiB" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock Text="Borradores en memoria: revisa y crea antes de salir de esta vista." Style="{StaticResource CaptionTextStyle}" />
                             </StackPanel>
                         </Border>
                         <Border x:Name="DestinationPanel" Grid.Row="1" Grid.Column="1" Style="{StaticResource PanelStyle}">
@@ -261,7 +273,7 @@
                     </Border>
                 </Grid>
                 <InfoBar x:Name="ValidationInfoBar" Severity="Warning" IsOpen="False" IsClosable="False" CornerRadius="8"
-                         Message="Puedes corregir el CSV y volver a cargarlo, o excluir las filas con errores para continuar." />
+                         Message="Edita o excluye las filas con errores antes de continuar. También puedes reemplazar el origen." />
                 </StackPanel>
                 <Border Grid.Row="1" Style="{StaticResource PanelStyle}" Padding="0">
                     <Grid RowDefinitions="Auto,Auto,*">
@@ -379,6 +391,11 @@
                                                         <TextBlock x:Name="RowDescription" Text="{Binding Draft.Description}" MaxLines="2" TextTrimming="CharacterEllipsis" Style="{StaticResource CaptionTextStyle}" />
                                                         <TextBlock x:Name="RowMembers" Text="{Binding MemberSummary}" Style="{StaticResource CaptionTextStyle}" />
                                                         <TextBlock x:Name="RowMessage" Text="{Binding Message}" Style="{StaticResource CaptionTextStyle}" />
+                                                        <TextBlock Text="{Binding ReviewNote}" Style="{StaticResource CaptionTextStyle}" />
+                                                        <StackPanel x:Name="ReviewRowActions" Orientation="Horizontal" Spacing="10">
+                                                            <HyperlinkButton Content="Editar" Tag="{Binding}" Click="EditRow_Click" Padding="0" />
+                                                            <HyperlinkButton x:Name="ExcludeRowButton" Content="Excluir" Tag="{Binding}" Click="ExcludeRow_Click" Padding="0" />
+                                                        </StackPanel>
                                                     </StackPanel>
                                                     <TextBlock x:Name="DueText" Grid.Column="2" Text="{Binding DueText}" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
                                                     <Border x:Name="StatusBadge" Grid.Column="3" Style="{StaticResource AccentBadgeStyle}" Background="{ThemeResource AppSuccessSurfaceBrush}" VerticalAlignment="Center">

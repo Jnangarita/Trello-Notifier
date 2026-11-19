@@ -34,6 +34,18 @@
                                Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" />
                 </StackPanel>
                 <InfoBar x:Name="CreationInfoBar" IsOpen="False" IsClosable="True" />
+                <Border Style="{StaticResource PanelStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Completar con Gemini" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="El texto se envía a Google Gemini. Revisa la propuesta antes de aplicarla; no se creará ninguna tarjeta hasta pulsar Crear tarjeta. Elige responsables y etiquetas manualmente." Style="{StaticResource CaptionTextStyle}" />
+                        <TextBox x:Name="GeminiPromptTextBox" Header="Describe la tarjeta" AcceptsReturn="True" TextWrapping="Wrap"
+                                 MinHeight="90" MaxHeight="200" MaxLength="20000" Style="{StaticResource InputTextBoxStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button x:Name="GenerateGeminiButton" Content="Generar propuesta" Click="GenerateGemini_Click" Style="{StaticResource ActionButtonStyle}" IsEnabled="False" />
+                            <Button x:Name="CancelGeminiButton" Content="Cancelar generación" Click="CancelGemini_Click" Visibility="Collapsed" Style="{StaticResource ActionButtonStyle}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <ProgressRing x:Name="LoadingRing" Width="24" Height="24" IsActive="True" />
                     <TextBlock x:Name="LoadingText" Text="Cargando tableros..." VerticalAlignment="Center"

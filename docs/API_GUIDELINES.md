@@ -1,7 +1,8 @@
 # Consumo de API
 
 No se expone una API de servidor. `Services/TrelloApiClient.cs` es el único
-cliente de tarjetas; reutilizarlo en UI y monitor.
+cliente de escritura de tarjetas en Trello; reutilizarlo en UI y monitor.
+`GeminiCardClient` solo genera propuestas y no tiene acceso al cliente Trello.
 
 | Aspecto | Implementación actual |
 | --- | --- |
@@ -51,7 +52,7 @@ El CSV no modifica las reglas de recordatorios ni añade peticiones desde los fi
 
 La UI de prueba de conexión muestra errores en InfoBar; el monitor los publica
 en `MonitorSnapshot.HasError`. Un fallo de API no debe consumir el historial
-de notificaciones. No agregar un segundo cliente ni retries que multipliquen
+de notificaciones. No agregar un segundo cliente Trello ni retries que multipliquen
 solicitudes sin evaluar el intervalo del monitor y los límites del proveedor.
 
 `GetAllCardsAsync` reutiliza el mismo flujo HTTP y enriquecimiento de tableros que
@@ -83,3 +84,48 @@ El cliente no valida un allowlist de hosts ni impide HTTP; cualquier credencial
 presente se envía al host configurado. No registrar URL completa y usar mocks
 sin secretos. Consultar [SECURITY.md](SECURITY.md) antes de cambiar autenticación,
 configuración o apertura de enlaces. Ejemplo de mock y prueba manual en README.
+
+## Propuestas de Gemini
+
+- `GeminiCardClient` compartido en `AppServices`, basado en `HttpClient`, sin SDK adicional.
+- Endpoint fijo HTTPS: `POST https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent`.
+  Modelo restringido a identificadores `gemini-*`, sin rutas ni query; redirecciones desactivadas.
+- Autenticación por `x-goog-api-key`; nunca utiliza la key/token de Trello.
+- `system_instruction` separa el contrato del texto de usuario en `contents`.
+  `generationConfig.response_mime_type=application/json` y `response_schema` definen
+  `cards[]` con `title`, `description`, `due`, `dateIssue`, `checklists`.
+  El esquema usa tipos OpenAPI `OBJECT`/`ARRAY`/`STRING` y `nullable: true` para
+  vencimientos ausentes, siguiendo el formato REST del ejemplo de Postman.
+  La clave es opaca (admite puntos); se rechazan espacios y caracteres no imprimibles.
+  El esquema enviado mantiene tipos, propiedades, campos requeridos y nulabilidad;
+  los límites de longitud/cantidad se aplican localmente para reducir complejidad del
+  esquema frente al formato simple comprobado en Postman.
+- Se exige un candidato terminado con `STOP`; se rechazan bloqueos, truncado, JSON
+  inválido, claves adicionales (incluidos IDs), listas vacías y tipos/tamaños incorrectos.
+- Límites locales: 20 000 caracteres de entrada, 1 propuesta individual / 50 por lote,
+  1 MiB de respuesta (también sin Content-Length), 60 segundos incluyendo la lectura,
+  16 384 tokens de salida solicitados. Título 200, descripción 10 000 y observación 500
+  caracteres; hasta 10 checklists individuales con 100 elementos de 500 caracteres.
+- No se envían catálogos ni credenciales de Trello. Las referencias relativas reciben
+  fecha actual con offset y zona Windows; fechas ambiguas o inconsistentes con esa zona
+  quedan vacías con una observación. Se requiere revisión humana de la interpretación.
+- La respuesta se convierte directamente en borradores/filas. `CardBatchPreparer`
+  comparte validación de fechas y preparación de filas con CSV; los responsables se
+  validan contra el tablero. El lote no acepta checklists ni etiquetas de Gemini.
+- No hay reintentos HTTP automáticos. Los mensajes distinguen clave/permisos, modelo,
+  cuota, timeout y respuesta inválida sin incluir cuerpos del proveedor. La UI cancela
+  al salir y conserva el borrador anterior al fallar/cancelar; solo los botones de
+  creación existentes escriben en Trello.
+
+Para errores HTTP se lee un máximo de 32 KiB, incluso sin Content-Length. Se traducen
+solo razones conocidas de `error.details[].reason`, parámetros permitidos de
+`fieldViolations`/`error.message` y `FAILED_PRECONDITION` a mensajes constantes.
+No se propagan cuerpos, metadatos ni mensajes originales en excepciones o logs. Si el
+detalle es desconocido, inválido o excesivo se conserva el código HTTP con un aviso
+genérico. La captura de un HTTP 400 por sí sola no confirma un fallo del esquema.
+
+Contrato y modelo consultados el 17/11/2026:
+[salida estructurada](https://ai.google.dev/gemini-api/docs/structured-output) y
+[Gemini 3.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
+Este último figura como estable y admite JSON estructurado. Su disponibilidad y cuota
+en una cuenta concreta deben comprobarse con esa cuenta; el modelo es configurable.

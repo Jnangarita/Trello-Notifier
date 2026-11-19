@@ -7,10 +7,10 @@
 
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
-            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#F4F6FA" />
-            <SolidColorBrush x:Key="AppNavigationBackgroundBrush" Color="#EBEFF5" />
-            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#FFFFFF" />
-            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#DCE3ED" />
+            <SolidColorBrush x:Key="AppPageBackgroundBrush" Color="#E8EDF2" />
+            <SolidColorBrush x:Key="AppNavigationBackgroundBrush" Color="#DEE6EE" />
+            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#F2F5F8" />
+            <SolidColorBrush x:Key="AppPanelBorderBrush" Color="#CBD5E1" />
             <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#192B46" />
             <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#52647C" />
             <SolidColorBrush x:Key="AppAccentTextBrush" Color="#175CD3" />
@@ -21,7 +21,7 @@
             <SolidColorBrush x:Key="AppDangerSurfaceBrush" Color="#FCE5E8" />
             <SolidColorBrush x:Key="AppSuccessTextBrush" Color="#147D4B" />
             <SolidColorBrush x:Key="AppSuccessSurfaceBrush" Color="#DAF5E6" />
-            <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="#F0F4F9" />
+            <SolidColorBrush x:Key="AppControlBackgroundBrush" Color="#E7EDF3" />
             <SolidColorBrush x:Key="AppBrandBrush" Color="#0878B5" />
             <SolidColorBrush x:Key="AppBrandTextBrush" Color="#FFFFFF" />
         </ResourceDictionary>

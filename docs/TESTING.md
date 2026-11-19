@@ -4,7 +4,8 @@
 `TrelloNotifier.Tests` es un ejecutable .NET 9 con runner propio en `Program.cs`:
 `Run(nombre, Func<Task>)`, `Check(condición, mensaje)`, salida `OK` y excepción
 que termina el proceso si falla. **`dotnet test` no ejecuta esta suite.**
-No hay xUnit/NUnit, tests UI automatizados ni tests del cliente HTTP real.
+No hay xUnit/NUnit ni tests UI en el runner. El cliente HTTP Trello se sustituye;
+el cliente Gemini real se enlaza con un `HttpMessageHandler` simulado, sin red.
 
 Los 11 casos originales cubren calendario/límites, intervalos, preferencias,
 migración de historial, agrupación, concurrencia entre comprobaciones,
@@ -40,6 +41,52 @@ sin compilar sus implementaciones reales. Reutilizar esos dobles y horas
 explícitas; no abrir datos del usuario ni notificaciones/red reales.
 Los nombres describen comportamiento esperado en español. Nueva lógica de
 negocio → tests. Bug fix → regression test cuando sea razonable.
+
+## Gemini y preparación de lotes
+
+El runner enlaza `GeminiCardClient` con `GeminiHttpDouble`: comprueba el endpoint y
+cabecera, separación de credenciales, referencia temporal, contrato estructurado,
+checklists individuales, límites de entrada/salida/cantidad, respuestas vacías,
+bloqueadas, truncadas, JSON inválido, IDs inventados, fechas ambiguas/zonas incorrectas,
+cancelación tardía y errores 400/401/403/404/429/500 sin reintentos ni cuerpos privados.
+`CardBatchPreparer` reutiliza los casos de responsables/CSV y conserva estados que no
+pueden volver a enviarse. SQLite cubre instalaciones nuevas, JSON, v1 y v2, migración
+concurrente, preferencias e historial conservados y persistencia de Gemini al reiniciar.
+
+Revisión WinUI con dobles: probar **Completar con Gemini** aplicando y descartando
+la propuesta sobre campos ya editados; comprobar que no crea hasta pulsar Crear.
+En lote, alternar CSV/Texto con IA, generar, editar título/descripción/fecha/usuarios,
+corregir una fecha inválida, excluir/incluir y volver al origen conservando cambios.
+Comprobar clave ausente, error HTTP, generación cancelada, navegación durante carga,
+doble clic, no reenvío de éxitos/inciertos y bloqueo de edición tras iniciar envíos.
+Revisar configuración, diálogos, scroll, foco, temas, contraste y escalado.
+
+Validación de esta implementación (17/11/2026): el build WinUI pasó sin errores ni
+advertencias. Un runner temporal enlazó las mismas fuentes y ejecutó 67 casos bajo
+.NET 6, incluidos los tres guards arquitectónicos; no sustituye la suite .NET 9.
+Ese runner reportó dos advertencias nullable preexistentes en el test del contrato
+de listas. Un host WinUI aislado comprobó las vistas reales con HTTP simulado, temas
+claro/oscuro, ventana amplia/compacta y edición/reintento. `verify.ps1` sigue bloqueado
+por faltar el SDK .NET 9 (solo está instalado 6.0.428); auditoría y validación completa
+deben ejecutarse con el SDK documentado. Quedan las comprobaciones manuales de alto
+contraste y escalado de Windows. Formato e imports de la app y `git diff --check`
+pasaron; el formato del runner aún señala espacios preexistentes en los fixtures
+de exportación CSV y migración v1. No se usaron cuentas, claves ni logs reales.
+
+El ajuste REST del 18/11/2026 añade comprobaciones de claves ficticias con punto,
+Content-Type, ruta exacta de `gemini-3.5-flash-lite`, `system_instruction`,
+`response_mime_type` y `response_schema` con tipos OpenAPI y vencimiento anulable.
+Se verifica también que los cuerpos de error privados no entren en excepciones.
+
+Diagnóstico del HTTP 400 (18/11/2026): dos regresiones adicionales distinguen claves
+inválidas/restringidas, API deshabilitada, parámetros rechazados y condiciones de uso
+mediante respuestas ficticias; comprueban ausencia de cuerpos privados en excepciones
+y límite de 32 KiB también para errores sin longitud conocida. El esquema enviado se
+simplifica sin retirar la validación local. La causa del rechazo de la cuenta real
+queda pendiente de confirmar con el detalle sanitizado de la aplicación recompilada.
+Resultado tras el ajuste: 69 casos correctos en el runner temporal .NET 6, build WinUI
+con 0 errores/advertencias, formato de la app y `git diff --check` correctos. Se mantienen
+los bloqueos de SDK y las incidencias preexistentes del runner descritos arriba.
 
 ## Arquitectura
 `ArchitectureTests.cs` usa Roslyn que ya viene con el SDK para verificar modelos

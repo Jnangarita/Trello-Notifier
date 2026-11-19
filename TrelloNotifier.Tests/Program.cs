@@ -10,6 +10,278 @@ using TrelloNotifier.Tests;
 DateTimeOffset now = new(2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
 int passed = 0;
 
+await Run("Gemini solicita JSON, aísla credenciales y devuelve propuestas sin destino", async () =>
+{
+    using var handler = new GeminiHttpDouble();
+    handler.Respond = async (request, token) =>
+    {
+        Check(request.Method == HttpMethod.Post && request.RequestUri!.Host == "generativelanguage.googleapis.com" &&
+            request.RequestUri.AbsolutePath == "/v1beta/models/gemini-3.5-flash-lite:generateContent" &&
+            request.RequestUri.Query == "", "Usar el mismo modelo y endpoint, sin secretos en query.");
+        Check(request.Headers.GetValues("x-goog-api-key").Single() == "dummy.gemini-key", "Admitir claves opacas con punto y autenticar por cabecera.");
+        Check(request.Content!.Headers.ContentType?.MediaType == "application/json", "Enviar Content-Type application/json.");
+        string payload = await request.Content!.ReadAsStringAsync(token);
+        Check(!payload.Contains("dummy-trello") && !payload.Contains("dummy.gemini-key"), "No incluir credenciales en el prompt.");
+        using JsonDocument body = JsonDocument.Parse(payload);
+        JsonElement configuration = body.RootElement.GetProperty("generationConfig");
+        Check(configuration.GetProperty("response_mime_type").GetString() == "application/json",
+            "Solicitar una respuesta estructurada.");
+        JsonElement cardSchema = configuration.GetProperty("response_schema").GetProperty("properties").GetProperty("cards");
+        string schemaText = cardSchema.GetRawText();
+        Check(!schemaText.Contains("maxLength") && !schemaText.Contains("maxItems") && !schemaText.Contains("minItems"),
+            "Mantener el esquema de transporte simple; aplicar límites en la validación local.");
+        Check(cardSchema.GetProperty("type").GetString() == "ARRAY" &&
+            cardSchema.GetProperty("items").GetProperty("properties").GetProperty("due").GetProperty("nullable").GetBoolean(),
+            "Usar response_schema con tipos OpenAPI y fechas realmente anulables.");
+        string instruction = body.RootElement.GetProperty("system_instruction").GetProperty("parts")[0].GetProperty("text").GetString()!;
+        Check(instruction.Contains(now.ToString("O")) && instruction.Contains(TimeZoneInfo.Utc.Id), "Enviar referencia temporal explícita.");
+        var card = GeminiHttpDouble.Proposal("2026-09-22T09:00:00Z");
+        card["checklists"] = new[] { new { name = "Revisión", items = new[] { "Contar", "Confirmar" } } };
+        return GeminiHttpDouble.Json(GeminiHttpDouble.Envelope(card));
+    };
+    using var client = new GeminiCardClient(handler);
+    var settings = new AppSettings { GeminiApiKey = "dummy.gemini-key", ApiKey = "dummy-trello-key", Token = "dummy-trello-token" };
+    List<CardImportRow> rows = await client.GenerateAsync(settings, "Revisar pedido mañana a las 09:00", true, now, TimeZoneInfo.Utc, CancellationToken.None);
+    TrelloCardDraft draft = rows.Single().Draft;
+    Check(draft.Name == "Revisar pedido" && draft.Due == new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero), "Convertir texto y fecha sin inventar un destino.");
+    Check(draft.ListId == "" && draft.MemberIds.Count == 0 && draft.LabelIds.Count == 0, "Las asignaciones pertenecen a la app.");
+    Check(draft.Checklists.Single().GetItems().SequenceEqual(new[] { "Contar", "Confirmar" }), "Conservar checklist individual.");
+    Check(handler.Calls == 1, "Generar no crea tarjetas ni hace solicitudes adicionales.");
+});
+
+await Run("Gemini limita entradas antes de enviar y mantiene opcional la configuración", async () =>
+{
+    using var handler = new GeminiHttpDouble();
+    using var client = new GeminiCardClient(handler);
+    foreach (var input in new[]
+    {
+        (Settings: new AppSettings(), Text: "Texto"),
+        (Settings: new AppSettings { GeminiApiKey = "dummy", GeminiModel = "https://otro.invalid" }, Text: "Texto"),
+        (Settings: new AppSettings { GeminiApiKey = "dummy\r\nheader" }, Text: "Texto"),
+        (Settings: new AppSettings { GeminiApiKey = "dummy key" }, Text: "Texto"),
+        (Settings: new AppSettings { GeminiApiKey = "dummy\u0000key" }, Text: "Texto"),
+        (Settings: new AppSettings { GeminiApiKey = "dummy" }, Text: " "),
+        (Settings: new AppSettings { GeminiApiKey = "dummy" }, Text: new string('x', GeminiCardClient.MaxInputCharacters + 1))
+    })
+    {
+        bool rejected = false;
+        try { await client.GenerateAsync(input.Settings, input.Text, false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (FormatException) { rejected = true; }
+        Check(rejected, "Rechazar configuración o texto inválido antes de HTTP.");
+    }
+    Check(handler.Calls == 0, "No hacer solicitudes inválidas.");
+    Check(new AppSettings { ApiBaseUrl = "http://localhost" }.IsConfigured, "El flujo Trello sigue sin requerir Gemini.");
+});
+
+await Run("Gemini rechaza respuestas bloqueadas, truncadas, vacías y contratos inventados", async () =>
+{
+    var extra = GeminiHttpDouble.Proposal();
+    extra["idList"] = "inventado";
+    var emptyTitle = GeminiHttpDouble.Proposal();
+    emptyTitle["title"] = " ";
+    var largeTitle = GeminiHttpDouble.Proposal();
+    largeTitle["title"] = new string('a', 201);
+    var checklist = GeminiHttpDouble.Proposal();
+    checklist["checklists"] = new[] { new { name = "No permitido en lote", items = new[] { "A" } } };
+    string[] invalid =
+    {
+        "{}", "[]", "no-json", "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}",
+        GeminiHttpDouble.Envelope().Replace("STOP", "MAX_TOKENS"), GeminiHttpDouble.Envelope(),
+        GeminiHttpDouble.Envelope(extra), GeminiHttpDouble.Envelope(emptyTitle), GeminiHttpDouble.Envelope(largeTitle),
+        GeminiHttpDouble.Envelope(checklist), GeminiHttpDouble.Envelope(GeminiHttpDouble.Proposal("2026-09-22T09:00:00")),
+        GeminiHttpDouble.Envelope(Enumerable.Range(0, 51).Select(_ => (object)GeminiHttpDouble.Proposal()).ToArray())
+    };
+    foreach (string json in invalid)
+    {
+        using var handler = new GeminiHttpDouble { Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(json)) };
+        using var client = new GeminiCardClient(handler);
+        bool rejected = false;
+        try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (Exception ex) when (ex is FormatException or JsonException) { rejected = true; }
+        Check(rejected && handler.Calls == 1, "No publicar propuestas parciales ni reintentar respuestas inválidas.");
+    }
+    using var multiple = new GeminiHttpDouble { Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(GeminiHttpDouble.Envelope(GeminiHttpDouble.Proposal(), GeminiHttpDouble.Proposal()))) };
+    using var singleClient = new GeminiCardClient(multiple);
+    bool rejectedSingle = false;
+    try { await singleClient.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Una", true, now, TimeZoneInfo.Utc, CancellationToken.None); }
+    catch (FormatException) { rejectedSingle = true; }
+    Check(rejectedSingle, "No tomar silenciosamente la primera propuesta en modo individual.");
+});
+
+await Run("Gemini conserva fechas ausentes y señala ambigüedad o zona incorrecta", async () =>
+{
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(GeminiHttpDouble.Envelope(
+            GeminiHttpDouble.Proposal(), GeminiHttpDouble.Proposal(null, "Falta la hora del viernes"),
+            GeminiHttpDouble.Proposal("2026-09-22T09:00:00-05:00"),
+            GeminiHttpDouble.Proposal("2026-09-22T09:00:00Z", "Fecha ambigua"))))
+    };
+    using var client = new GeminiCardClient(handler);
+    List<CardImportRow> rows = await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None);
+    Check(rows.All(row => row.Draft.Due is null), "No asignar fechas ambiguas o inconsistentes.");
+    Check(rows[0].ReviewNote == "" && rows.Skip(1).All(row => row.ReviewNote.Length > 0), "Distinguir ausencia de fecha de ambigüedad.");
+    rows = CardBatchPreparer.Prepare(rows, "lista-real", Array.Empty<TrelloMember>(), Array.Empty<string>());
+    Check(rows.All(row => row.CanSubmit && row.Draft.ListId == "lista-real") && rows[1].ReviewNote.Contains("hora"), "Preparar sin CSV y conservar las observaciones.");
+});
+
+await Run("Gemini limita respuestas, no reintenta errores y no muestra el cuerpo privado", async () =>
+{
+    foreach (System.Net.HttpStatusCode status in new[]
+    {
+        System.Net.HttpStatusCode.BadRequest, System.Net.HttpStatusCode.Unauthorized, System.Net.HttpStatusCode.Forbidden,
+        System.Net.HttpStatusCode.NotFound, System.Net.HttpStatusCode.TooManyRequests, System.Net.HttpStatusCode.InternalServerError
+    })
+    {
+        using var handler = new GeminiHttpDouble { Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("private-response-secret", status)) };
+        using var client = new GeminiCardClient(handler);
+        bool rejected = false;
+        try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (HttpRequestException ex)
+        {
+            rejected = true;
+            Check(ex.StatusCode == status && !ex.Message.Contains("private-response-secret") &&
+                !GeminiCardClient.GetErrorMessage(ex).Contains("private-response-secret"), "Conservar status sin revelar el cuerpo.");
+        }
+        Check(rejected && handler.Calls == 1, "Sin reintentos automáticos, incluso ante 429.");
+    }
+    foreach (bool knownLength in new[] { true, false })
+    {
+        using var handler = new GeminiHttpDouble
+        {
+            Respond = (_, _) =>
+            {
+                var content = new StreamContent(new GeminiHttpDouble.NonSeekableStream(new byte[GeminiCardClient.MaxResponseBytes + 1]));
+                if (knownLength) content.Headers.ContentLength = GeminiCardClient.MaxResponseBytes + 1;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = content });
+            }
+        };
+        using var client = new GeminiCardClient(handler);
+        bool rejected = false;
+        try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (FormatException) { rejected = true; }
+        Check(rejected, "Limitar la respuesta recibida.");
+    }
+});
+
+await Run("Gemini distingue errores del proveedor sin exponer mensajes ni metadatos privados", async () =>
+{
+    const string secret = "private-body-dummy-key-and-prompt";
+    var cases = new[]
+    {
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, details = new[] { new { reason = "API_KEY_INVALID", metadata = new { key = secret } } } } }), Expected: "API key no es válida"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, details = new[] { new { reason = "API_KEY_SERVICE_BLOCKED" } } } }), Expected: "restricciones"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, details = new[] { new { reason = "SERVICE_DISABLED" } } } }), Expected: "deshabilitada"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, details = new[] { new { fieldViolations = new[] { new { field = "generation_config.response_schema.properties[private]", description = secret } } } } } }), Expected: "response_schema"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = "Invalid generation_config.response_schema: " + secret } }), Expected: "response_schema"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = "Invalid maxOutputTokens: " + secret } }), Expected: "maxOutputTokens"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, status = "FAILED_PRECONDITION" } }), Expected: "condición de uso"),
+        (Body: JsonSerializer.Serialize(new { error = new { message = secret, status = "UNKNOWN", details = new[] { new { reason = secret } } } }), Expected: "sin un detalle reconocible")
+    };
+    foreach (var item in cases)
+    {
+        using var handler = new GeminiHttpDouble { Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(item.Body, System.Net.HttpStatusCode.BadRequest)) };
+        using var client = new GeminiCardClient(handler);
+        bool rejected = false;
+        try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (HttpRequestException ex)
+        {
+            rejected = true;
+            string message = GeminiCardClient.GetErrorMessage(ex);
+            Check(ex.StatusCode == System.Net.HttpStatusCode.BadRequest && message.Contains(item.Expected), "Clasificar la evidencia del servidor y conservar HTTP 400.");
+            Check(!message.Contains(secret) && !ex.ToString().Contains(secret) && ex.Data.Count == 0, "Nunca propagar texto, metadata ni claves del error.");
+        }
+        Check(rejected && handler.Calls == 1, "Informar el rechazo sin reintentar.");
+    }
+});
+
+await Run("Gemini acota el detalle de errores y conserva HTTP ante cuerpos inválidos", async () =>
+{
+    foreach (string body in new[] { "<html>Error privado</html>", "{", "[]", "{\"error\":{\"details\":[null]}}", new string('x', 32769) })
+    {
+        using var handler = new GeminiHttpDouble
+        {
+            Respond = (_, _) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+            {
+                Content = new StreamContent(new GeminiHttpDouble.NonSeekableStream(System.Text.Encoding.UTF8.GetBytes(body)))
+            })
+        };
+        using var client = new GeminiCardClient(handler);
+        bool rejected = false;
+        try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, CancellationToken.None); }
+        catch (HttpRequestException ex)
+        {
+            rejected = true;
+            Check(ex.StatusCode == System.Net.HttpStatusCode.BadRequest && GeminiCardClient.GetErrorMessage(ex).Contains("sin un detalle reconocible"),
+                "Un cuerpo inválido o excesivo mantiene el rechazo HTTP original.");
+        }
+        Check(rejected, "Rechazar sin publicar datos del cuerpo.");
+    }
+});
+
+await Run("Gemini propaga cancelación y descarta una respuesta tardía", async () =>
+{
+    using var cancellation = new CancellationTokenSource();
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) =>
+        {
+            cancellation.Cancel();
+            return Task.FromResult(GeminiHttpDouble.Json(GeminiHttpDouble.Envelope(GeminiHttpDouble.Proposal())));
+        }
+    };
+    using var client = new GeminiCardClient(handler);
+    bool cancelled = false;
+    try { await client.GenerateAsync(new AppSettings { GeminiApiKey = "dummy" }, "Pendientes", false, now, TimeZoneInfo.Utc, cancellation.Token); }
+    catch (OperationCanceledException) { cancelled = true; }
+    Check(cancelled && handler.Calls == 1, "No publicar una respuesta después de cancelar.");
+});
+
+await Run("La revalidación del lote conserva excluidas y resultados sin habilitar reenvíos", () =>
+{
+    CardImportRow[] source = Enum.GetValues<CardImportState>().Select((state, index) => new CardImportRow
+    {
+        RowNumber = index + 1,
+        State = state,
+        Draft = new TrelloCardDraft { Name = "Revisada" }
+    }).ToArray();
+    List<CardImportRow> prepared = CardBatchPreparer.Prepare(source, "lista", Array.Empty<TrelloMember>(), Array.Empty<string>());
+    foreach (CardImportRow row in prepared)
+    {
+        CardImportState previous = source[row.RowNumber - 1].State;
+        Check(row.State == (previous == CardImportState.Invalid ? CardImportState.Ready : previous), "Solo revalidar borradores previos al envío.");
+    }
+    return Task.CompletedTask;
+});
+
+await Run("SQLite v2 migra Gemini opcional sin perder preferencias ni historial", async () =>
+{
+    using var fixture = new Fixture(false);
+    using (SqliteConnection connection = fixture.OpenDatabase())
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = @"
+            CREATE TABLE AppSettings (
+                Id INTEGER NOT NULL PRIMARY KEY, ApiBaseUrl TEXT NOT NULL, ApiKey TEXT NOT NULL, Token TEXT NOT NULL,
+                NotifyBeforeMinutes INTEGER NOT NULL, PollIntervalMinutes INTEGER NOT NULL, RepeatReminderMinutes INTEGER NOT NULL,
+                IncludeOverdueCards INTEGER NOT NULL, PlaySound INTEGER NOT NULL, Theme TEXT NOT NULL, NotificationsEnabled INTEGER NOT NULL);
+            CREATE TABLE NotificationHistory (CardKey TEXT NOT NULL PRIMARY KEY, LastNotifiedAt TEXT NOT NULL);
+            INSERT INTO AppSettings VALUES (1, 'http://localhost', 'dummy-key', 'dummy-token', 120, 7, 0, 1, 0, 'Dark', 0);
+            INSERT INTO NotificationHistory VALUES ('previa', $last);
+            PRAGMA user_version = 2;";
+        command.Parameters.AddWithValue("$last", now.ToString("O"));
+        command.ExecuteNonQuery();
+    }
+    AppSettings[] loaded = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(fixture.Store.Load)));
+    Check(loaded.All(settings => settings.GeminiApiKey == "" && settings.GeminiModel == AppSettings.DefaultGeminiModel &&
+        !settings.NotificationsEnabled && settings.Theme == "Dark" && settings.NotifyBeforeMinutes == 120 && settings.Token == "dummy-token"),
+        "Migración concurrente con valores predeterminados y preferencias conservadas.");
+    Check(fixture.Store.LoadNotifiedCards()["previa"].EqualsExact(now), "Conservar historial.");
+    loaded[0].GeminiApiKey = "dummy-gemini-key";
+    fixture.Store.Save(loaded[0]);
+    Check(new SettingsStore(fixture.DirectoryPath).Load().GeminiApiKey == "dummy-gemini-key", "Conservar Gemini tras reiniciar.");
+});
+
 await Run("CSV admite BOM, comillas escapadas, Markdown y descripciones multilínea", () =>
 {
     string csv = "\uFEFFtitulo,descripcion,vencimiento,responsables\r\n\"Revisar, pedido\",\"**Importante**: \"\"urgente\"\"\r\nlínea 2\",2026-12-05T09:00:00-05:00,ana;@carlos\r\n";
@@ -66,15 +338,15 @@ await Run("Importación combina responsables por fila y predeterminados sin asig
     };
     List<CardImportRow> source = CardCsvImporter.Parse(
         "titulo,responsables\nComún,\nPropios,@ANA;carlos;ana\nDesconocido,nadie\nSolo símbolo,@\n ,ana", CancellationToken.None);
-    List<CardImportRow> rows = CardCsvImporter.Prepare(source, "lista", members, new[] { "b" });
+    List<CardImportRow> rows = CardBatchPreparer.Prepare(source, "lista", members, new[] { "b" });
     Check(rows[0].Draft.MemberIds.SequenceEqual(new[] { "b" }), "Aplicar predeterminados a celdas vacías.");
     Check(rows[1].Draft.MemberIds.SequenceEqual(new[] { "a", "b" }), "Los responsables de la fila prevalecen y no se duplican.");
     Check(rows.Take(2).All(row => row.State == CardImportState.Ready && row.Draft.ListId == "lista"), "Preparar válidas para el destino elegido.");
     Check(rows.Skip(2).All(row => row.State == CardImportState.Invalid), "Exigir usuarios reconocidos y título útil.");
     Check(source[0].Draft.ListId == "" && source[0].Draft.MemberIds.Count == 0, "Revisar no debe mutar el archivo de origen.");
-    Check(CardCsvImporter.Prepare(source.Take(1), "lista", members, new[] { "ausente" })[0].State == CardImportState.Invalid,
+    Check(CardBatchPreparer.Prepare(source.Take(1), "lista", members, new[] { "ausente" })[0].State == CardImportState.Invalid,
         "No omitir silenciosamente un responsable predeterminado ausente.");
-    Check(CardCsvImporter.Prepare(source.Take(1), "", members, Array.Empty<string>())[0].State == CardImportState.Invalid,
+    Check(CardBatchPreparer.Prepare(source.Take(1), "", members, Array.Empty<string>())[0].State == CardImportState.Invalid,
         "Reutilizar la validación de destino del borrador.");
     return Task.CompletedTask;
 });
@@ -697,6 +969,8 @@ await Run("SQLite conserva todas las preferencias sin crear archivos JSON", () =
         ApiBaseUrl = "https://mock.example.com/api",
         ApiKey = "dummy-key-'ñ",
         Token = "dummy-token-'); DROP TABLE AppSettings; --",
+        GeminiApiKey = "dummy-gemini-'key",
+        GeminiModel = "gemini-model-test",
         NotifyBeforeMinutes = 180,
         PollIntervalMinutes = 11,
         RepeatReminderMinutes = 60,
@@ -753,7 +1027,7 @@ await Run("Migración SQLite v1 conserva preferencias e historial y activa los a
     using SqliteConnection migratedConnection = fixture.OpenDatabase();
     using SqliteCommand versionCommand = migratedConnection.CreateCommand();
     versionCommand.CommandText = "PRAGMA user_version;";
-    Check(Convert.ToInt32(versionCommand.ExecuteScalar()) == 2, "Confirmar la nueva versión del esquema.");
+    Check(Convert.ToInt32(versionCommand.ExecuteScalar()) == 3, "Confirmar la nueva versión del esquema.");
 });
 
 await Run("Migración de ambos JSON conserva precisión y no vuelve a importar respaldos", () =>
@@ -869,7 +1143,7 @@ await Run("Versión futura y base corrupta se conservan sin reinicialización", 
     using (SqliteConnection connection = fixture.OpenDatabase())
     {
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version = 3;";
+        command.CommandText = "PRAGMA user_version = 4;";
         command.ExecuteNonQuery();
     }
     ExpectStorageFailure(() => fixture.Store.Save(new AppSettings()));

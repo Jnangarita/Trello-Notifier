@@ -267,7 +267,7 @@ El formulario conserva lo escrito ante un rechazo explícito de Trello y permite
 1. Abre **Crear tarjeta → Creación masiva** y descarga la plantilla si la necesitas.
 2. Arrastra un archivo a la zona CSV o pulsa **Elegir archivo** para seleccionar un CSV **UTF-8**, de hasta **2 MiB y 1000 tarjetas**. Admite separadores coma o punto y coma, campos entre comillas, comillas escapadas y descripciones multilínea.
 3. Selecciona un **tablero**, una **lista** y, opcionalmente, varios **responsables predeterminados** para el lote.
-4. Pulsa **Revisar tarjetas**. Se muestran título, descripción, vencimiento en hora local, responsables y errores por fila. Corrige el CSV y vuelve a cargarlo, o marca **Excluir las filas con errores**.
+4. Pulsa **Revisar tarjetas**. Se muestran título, descripción, vencimiento en hora local, responsables y errores por fila. Usa **Editar** para corregir los campos (el vencimiento se introduce en ISO 8601 con zona), **Excluir / Incluir** para cada fila o **Excluir las filas con errores**. También puedes corregir y volver a cargar el CSV. La edición se bloquea al iniciar el envío.
 5. Pulsa **Crear tarjetas**. Los envíos son secuenciales, con una pausa de 500 ms entre solicitudes. Puedes **Detener después de esta tarjeta** y continuar después, sin repetir las ya creadas.
 6. Consulta el resumen de creadas, pendientes y excluidas, descarga los resultados o abre las tarjetas creadas en Trello. El CSV de resultados incluye fila, título, estado, ID, URL y detalle, con protección frente a fórmulas de hoja de cálculo. **Nueva importación** permite iniciar otro lote.
 
@@ -289,6 +289,37 @@ Enviar informe,Resumen semanal,,
 El lote se detiene ante un error. **Continuar / reintentar** solo envía filas pendientes o rechazadas explícitamente (400/401/403/404/429); espera y corrige permisos/destino según corresponda antes de reintentar. Las creadas, excluidas y de resultado incierto no se reenvían. Un timeout o respuesta inválida puede significar que Trello sí creó la tarjeta: revisa el tablero antes de iniciar otra importación de esa fila.
 
 El progreso se conserva únicamente mientras permanezcas en la vista: descarga los resultados antes de salir. Los checklists y las etiquetas se configuran en la creación manual o directamente en Trello; no son columnas de este formato CSV.
+
+### Crear propuestas con Gemini
+
+Gemini es opcional: la creación manual y CSV siguen funcionando sin configurarlo.
+
+1. En **Configuración → Gemini**, introduce una API key de
+   [Google AI Studio](https://aistudio.google.com/apikey) y guarda los cambios.
+   El modelo predeterminado es `gemini-3.5-flash-lite`; puedes cambiarlo por un
+   modelo disponible en tu cuenta que admita respuestas JSON estructuradas.
+   La API tiene cuotas y costes propios, independientes de la suscripción al chat de Gemini.
+2. **Una tarjeta:** en **Creación manual → Completar con Gemini**, pega el texto y
+   pulsa **Generar propuesta**. Revisa la vista previa: **Aplicar y reemplazar**
+   sustituye título, descripción, vencimiento y checklists; **Conservar formulario**
+   mantiene la edición anterior. Selecciona responsables y etiquetas en el formulario.
+3. **Varias tarjetas:** en **Creación masiva**, selecciona **Origen → Texto con IA**,
+   elige tablero, lista y responsables predeterminados y pulsa **Generar tareas**.
+   Revisa, edita o excluye las propuestas antes de pulsar **Crear tarjetas en Trello**.
+   Este flujo genera título, descripción y vencimiento; no genera checklists ni etiquetas.
+
+Se admiten **20 000 caracteres** y hasta **50 propuestas** por generación. La respuesta
+se limita a **1 MiB** y la solicitud a **60 segundos**, sin reintentos automáticos.
+Cancelar o recibir una respuesta inválida conserva el borrador/origen anterior.
+En el lote, una generación correcta reemplaza el origen cargado. Salir de la vista
+cancela la generación y descarta sus resultados tardíos; los borradores no se guardan.
+
+El texto se envía a Google Gemini junto con la fecha y zona horaria de Windows,
+sin credenciales ni datos consultados de Trello. Se pide al modelo no inventar fechas
+ni asignaciones. Las fechas ambiguas se dejan vacías con una observación para revisión;
+comprueba siempre la interpretación y selecciona los responsables en la app. Gemini
+solo propone contenido: la creación utiliza el cliente Trello y las reglas de envío
+existentes, después de tu revisión. La clave de Gemini se guarda **sin cifrar** en SQLite.
 
 ### Consulta de tarjetas
 
@@ -462,9 +493,10 @@ La base se crea al acceder por primera vez a las preferencias o al historial:
 - `NotificationHistory` guarda la clave de tarjeta y vencimiento y la fecha del último aviso, conservando su precisión y zona horaria original (offset).
 - `PRAGMA user_version` identifica la versión del esquema. Una versión desconocida se rechaza sin sobrescribirla.
 
-El esquema 2 añade la preferencia de notificaciones de escritorio. Las bases del
-esquema 1 se actualizan automáticamente en una transacción, con los avisos activados
-por defecto y conservando las demás preferencias y el historial.
+El esquema 3 añade la clave y el modelo opcionales de Gemini. Las bases de los esquemas
+1 y 2 se actualizan automáticamente en una transacción, conservando preferencias e
+historial. Al migrar desde el esquema 1 también se añade la preferencia de avisos
+del esquema 2, activada por defecto.
 
 Si existen `settings.json` o `notified-cards.json`, se importan juntos en una transacción. También se admite el historial antiguo de claves sin fechas: recibe una única hora de migración para evitar avisos duplicados inmediatos. Los campos de configuración ausentes conservan los valores predeterminados.
 

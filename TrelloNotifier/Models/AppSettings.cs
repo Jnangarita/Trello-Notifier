@@ -2,6 +2,9 @@ namespace TrelloNotifier.Models;
 
 public sealed class AppSettings
 {
+    public const string DefaultGeminiModel = "gemini-3.5-flash-lite";
+    public string GeminiApiKey { get; set; } = string.Empty;
+    public string GeminiModel { get; set; } = DefaultGeminiModel;
     public string ApiBaseUrl { get; set; } = "https://api.trello.com";
     public string ApiKey { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;

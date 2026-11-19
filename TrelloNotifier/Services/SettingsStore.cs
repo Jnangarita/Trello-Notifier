@@ -8,7 +8,7 @@ namespace TrelloNotifier.Services;
 
 internal sealed class SettingsStore
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private readonly string _directoryPath;
 
     public SettingsStore(string? directoryPath = null)
@@ -23,7 +23,7 @@ internal sealed class SettingsStore
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = @"
             SELECT ApiBaseUrl, ApiKey, Token, NotifyBeforeMinutes, PollIntervalMinutes,
-                   RepeatReminderMinutes, IncludeOverdueCards, PlaySound, Theme, NotificationsEnabled
+                   RepeatReminderMinutes, IncludeOverdueCards, PlaySound, Theme, NotificationsEnabled, GeminiApiKey, GeminiModel
             FROM AppSettings WHERE Id = 1;";
         using SqliteDataReader reader = command.ExecuteReader();
         if (!reader.Read())
@@ -42,7 +42,9 @@ internal sealed class SettingsStore
             IncludeOverdueCards = reader.GetBoolean(6),
             PlaySound = reader.GetBoolean(7),
             Theme = reader.GetString(8),
-            NotificationsEnabled = reader.GetBoolean(9)
+            NotificationsEnabled = reader.GetBoolean(9),
+            GeminiApiKey = reader.GetString(10),
+            GeminiModel = reader.GetString(11)
         };
     });
 
@@ -135,6 +137,17 @@ internal sealed class SettingsStore
                     CHECK (NotificationsEnabled IN (0, 1));
                 PRAGMA user_version = 2;";
             command.ExecuteNonQuery();
+            version = 2;
+        }
+        if (version == 2)
+        {
+            command.CommandText = @"
+                ALTER TABLE AppSettings ADD COLUMN GeminiApiKey TEXT NOT NULL DEFAULT '';
+                ALTER TABLE AppSettings ADD COLUMN GeminiModel TEXT NOT NULL DEFAULT '';
+                UPDATE AppSettings SET GeminiModel = $model;
+                PRAGMA user_version = 3;";
+            command.Parameters.AddWithValue("$model", AppSettings.DefaultGeminiModel);
+            command.ExecuteNonQuery();
             transaction.Commit();
             Log.ForContext<SettingsStore>().Information("Base local actualizada al esquema {SchemaVersion}", SchemaVersion);
             return;
@@ -152,7 +165,9 @@ internal sealed class SettingsStore
                 IncludeOverdueCards INTEGER NOT NULL CHECK (IncludeOverdueCards IN (0, 1)),
                 PlaySound INTEGER NOT NULL CHECK (PlaySound IN (0, 1)),
                 Theme TEXT NOT NULL,
-                NotificationsEnabled INTEGER NOT NULL DEFAULT 1 CHECK (NotificationsEnabled IN (0, 1))
+                NotificationsEnabled INTEGER NOT NULL DEFAULT 1 CHECK (NotificationsEnabled IN (0, 1)),
+                GeminiApiKey TEXT NOT NULL,
+                GeminiModel TEXT NOT NULL
             );
             CREATE TABLE NotificationHistory (
                 CardKey TEXT NOT NULL PRIMARY KEY,
@@ -164,7 +179,7 @@ internal sealed class SettingsStore
         Dictionary<string, DateTimeOffset> history = ReadLegacyHistory();
         WriteSettings(connection, transaction, settings);
         WriteHistory(connection, transaction, history);
-        command.CommandText = "PRAGMA user_version = 2;";
+        command.CommandText = "PRAGMA user_version = 3;";
         command.ExecuteNonQuery();
         transaction.Commit();
         Log.ForContext<SettingsStore>().Information("Base local inicializada e importación de datos anteriores completada. Esquema {SchemaVersion}", SchemaVersion);
@@ -176,7 +191,7 @@ internal sealed class SettingsStore
         command.Transaction = transaction;
         command.CommandText = "PRAGMA user_version;";
         int version = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
-        if (version is not (0 or 1 or SchemaVersion))
+        if (version is not (0 or 1 or 2 or SchemaVersion))
         {
             throw new IOException("La versión de la base de datos no es compatible con esta aplicación. No se han modificado los datos.");
         }
@@ -189,14 +204,15 @@ internal sealed class SettingsStore
         command.Transaction = transaction;
         command.CommandText = @"
             INSERT INTO AppSettings (Id, ApiBaseUrl, ApiKey, Token, NotifyBeforeMinutes, PollIntervalMinutes,
-                                     RepeatReminderMinutes, IncludeOverdueCards, PlaySound, Theme, NotificationsEnabled)
-            VALUES (1, $url, $key, $token, $before, $poll, $repeat, $overdue, $sound, $theme, $notifications)
+                                     RepeatReminderMinutes, IncludeOverdueCards, PlaySound, Theme, NotificationsEnabled, GeminiApiKey, GeminiModel)
+            VALUES (1, $url, $key, $token, $before, $poll, $repeat, $overdue, $sound, $theme, $notifications, $geminiKey, $geminiModel)
             ON CONFLICT(Id) DO UPDATE SET
                 ApiBaseUrl = excluded.ApiBaseUrl, ApiKey = excluded.ApiKey, Token = excluded.Token,
                 NotifyBeforeMinutes = excluded.NotifyBeforeMinutes, PollIntervalMinutes = excluded.PollIntervalMinutes,
                 RepeatReminderMinutes = excluded.RepeatReminderMinutes, IncludeOverdueCards = excluded.IncludeOverdueCards,
                 PlaySound = excluded.PlaySound, Theme = excluded.Theme,
-                NotificationsEnabled = excluded.NotificationsEnabled;";
+                NotificationsEnabled = excluded.NotificationsEnabled,
+                GeminiApiKey = excluded.GeminiApiKey, GeminiModel = excluded.GeminiModel;";
         command.Parameters.AddWithValue("$url", settings.ApiBaseUrl);
         command.Parameters.AddWithValue("$key", settings.ApiKey);
         command.Parameters.AddWithValue("$token", settings.Token);
@@ -207,6 +223,8 @@ internal sealed class SettingsStore
         command.Parameters.AddWithValue("$sound", settings.PlaySound);
         command.Parameters.AddWithValue("$theme", settings.Theme);
         command.Parameters.AddWithValue("$notifications", settings.NotificationsEnabled);
+        command.Parameters.AddWithValue("$geminiKey", settings.GeminiApiKey);
+        command.Parameters.AddWithValue("$geminiModel", settings.GeminiModel);
         command.ExecuteNonQuery();
     }
 
@@ -232,7 +250,8 @@ internal sealed class SettingsStore
         try
         {
             AppSettings settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? throw new JsonException();
-            if (settings.ApiBaseUrl is null || settings.ApiKey is null || settings.Token is null || settings.Theme is null)
+            if (settings.ApiBaseUrl is null || settings.ApiKey is null || settings.Token is null || settings.Theme is null ||
+                settings.GeminiApiKey is null || settings.GeminiModel is null)
             {
                 throw new JsonException();
             }

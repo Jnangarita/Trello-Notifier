@@ -9,6 +9,8 @@ Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework
 App → MainWindow / MainPage → DashboardPage / SettingsPage
 MainPage → CreateCardPage → SettingsStore / TrelloApiClient
 MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
+CreateCardPage / BulkCreateCardPage → GeminiCardClient → HTTP Gemini (solo propuestas)
+BulkCreateCardPage / CardCsvImporter / GeminiCardClient → CardBatchPreparer
 MainPage → DiagnosticsPage → AppLogReader → archivos locales de AppLog
 App / páginas → AppServices (composición de instancias concretas)
 DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
@@ -52,13 +54,22 @@ al navegar o cambiar de tablero; durante una escritura se impide navegar para co
 su resultado. Los fallos parciales o inciertos se muestran sin repetir el POST inicial.
 
 `BulkCreateCardPage` coordina selector de archivos WinUI, destino, revisión y envío
-secuencial. `CardCsvImporter` procesa texto con `TextFieldParser` de .NET, prepara los
-`TrelloCardDraft` reutilizando su validación y exporta resultados con escape CSV y
+secuencial. `CardCsvImporter` procesa texto con `TextFieldParser` de .NET y exporta resultados con escape CSV y
 protección contra fórmulas. `CardImportRow`/`CardImportState` representan filas y sus
 estados sin depender de UI, archivos o HTTP. El progreso es local a la vista; se
 exporta a un archivo elegido por el usuario. El HWND del selector procede de `App`.
 La clasificación de rechazos confirmados pertenece a `TrelloApiClient` y se comparte
 con la creación manual; `TrelloCard.TrelloUri` centraliza sus enlaces HTTPS seguros.
+
+`GeminiCardClient` usa un `HttpClient` compartido con cancelación, timeout y lectura
+acotada. Analiza y valida el JSON en el servicio y devuelve propuestas `CardImportRow`
+con `TrelloCardDraft` y observaciones de fechas, sin destino ni asignaciones. La vista
+individual pide confirmar el reemplazo y reutiliza los campos/checklists existentes.
+La vista de lote admite CSV o texto y permite editar/excluir filas antes del primer
+envío. `CardBatchPreparer` extrae la preparación antes ubicada en `CardCsvImporter`:
+valida fechas, responsables y borradores para ambos orígenes, preservando resultados
+creados/excluidos/inciertos. Gemini no recibe servicios de Trello ni accede a SQLite.
+El esquema SQLite 3 añade `GeminiApiKey` y `GeminiModel`; migra v1/v2 transaccionalmente.
 
 `App` inicializa `Services/AppLog` antes de usar `AppServices` y vacía Serilog al
 cerrar o ante un fallo fatal. Los servicios y las fronteras de UI usan el logger

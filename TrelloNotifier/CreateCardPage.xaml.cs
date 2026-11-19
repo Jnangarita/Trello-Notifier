@@ -20,6 +20,9 @@ public sealed partial class CreateCardPage : Page
     private bool _loadingBoardDetails;
     private bool _submitting;
     private bool _submissionUncertain;
+    private bool _generating;
+    private CancellationTokenSource? _geminiCancellation;
+    private ContentDialog? _geminiDialog;
 
     public CreateCardPage()
     {
@@ -36,6 +39,8 @@ public sealed partial class CreateCardPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        _geminiCancellation?.Cancel();
+        _geminiDialog?.Hide();
         _boardCancellation?.Cancel();
         _boardCancellation?.Dispose();
         _boardCancellation = null;
@@ -61,7 +66,7 @@ public sealed partial class CreateCardPage : Page
 
     private async Task LoadBoardsAsync()
     {
-        if (_pageCancellation is null || _loadingBoards || _submitting) return;
+        if (_pageCancellation is null || _loadingBoards || _submitting || _generating) return;
         CancellationToken token = _pageCancellation.Token;
         _loadingBoards = true;
         _boardCancellation?.Cancel();
@@ -186,6 +191,88 @@ public sealed partial class CreateCardPage : Page
 
     private void ClearDueDate_Click(object sender, RoutedEventArgs e) => DueDatePicker.Date = null;
 
+    private void CancelGemini_Click(object sender, RoutedEventArgs e) => _geminiCancellation?.Cancel();
+
+    private async void GenerateGemini_Click(object sender, RoutedEventArgs e)
+    {
+        if (_generating || !GenerateGeminiButton.IsEnabled || _pageCancellation is null) return;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_pageCancellation.Token);
+        _geminiCancellation = cancellation;
+        CancellationToken token = cancellation.Token;
+        _generating = true;
+        CardForm.IsEnabled = false;
+        GeminiPromptTextBox.IsEnabled = false;
+        RetryLoadButton.IsEnabled = false;
+        CancelGeminiButton.Visibility = Visibility.Visible;
+        UpdateCreateButton();
+        SetLoading(true, "Generando propuesta con Gemini...");
+        try
+        {
+            AppSettings settings = await Task.Run(AppServices.Settings.Load, token);
+            List<CardImportRow> proposals = await AppServices.Gemini.GenerateAsync(settings, GeminiPromptTextBox.Text,
+                true, DateTimeOffset.Now, TimeZoneInfo.Local, token);
+            token.ThrowIfCancellationRequested();
+            CardImportRow proposal = proposals[0];
+            TrelloCardDraft draft = proposal.Draft;
+            string preview = $"{draft.Name}\n\n{draft.Description}\n\nVencimiento: {proposal.DueText}\n{proposal.ReviewNote}";
+            foreach (TrelloChecklistDraft checklist in draft.Checklists)
+                preview += $"\n\n{checklist.Name}\n{checklist.ItemsText}";
+            _geminiDialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
+                Title = "Revisar propuesta de Gemini",
+                Content = new ScrollViewer
+                {
+                    MaxHeight = 400,
+                    Content = new TextBlock { Text = "Aplicar reemplazará título, descripción, vencimiento y checklists del formulario.\n\n" + preview, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true }
+                },
+                PrimaryButtonText = "Aplicar y reemplazar",
+                CloseButtonText = "Conservar formulario",
+                DefaultButton = ContentDialogButton.Close
+            };
+            SetLoading(false);
+            CancelGeminiButton.Visibility = Visibility.Collapsed;
+            ContentDialogResult result = await _geminiDialog.ShowAsync();
+            token.ThrowIfCancellationRequested();
+            if (result != ContentDialogResult.Primary) return;
+            TitleTextBox.Text = draft.Name;
+            DescriptionTextBox.Text = draft.Description;
+            DueDatePicker.Date = draft.Due?.ToLocalTime();
+            if (draft.Due is DateTimeOffset due) DueTimePicker.Time = due.ToLocalTime().TimeOfDay;
+            _checklists.Clear();
+            foreach (TrelloChecklistDraft checklist in draft.Checklists) _checklists.Add(checklist);
+            ShowMessage("Propuesta aplicada. Revisa los campos y el destino antes de crear. " + proposal.ReviewNote, InfoBarSeverity.Informational);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Cancelar o salir conserva el formulario anterior.
+        }
+        catch (Exception ex) when (ex is FormatException or HttpRequestException or JsonException or IOException or OperationCanceledException)
+        {
+            if (_pageCancellation?.IsCancellationRequested == false)
+            {
+                AppLog.WriteFailure("GenerateManualGeminiCard", ex);
+                ShowMessage(GeminiCardClient.GetErrorMessage(ex), InfoBarSeverity.Warning);
+            }
+        }
+        finally
+        {
+            _geminiDialog = null;
+            _geminiCancellation = null;
+            _generating = false;
+            if (_pageCancellation?.IsCancellationRequested == false)
+            {
+                CardForm.IsEnabled = true;
+                GeminiPromptTextBox.IsEnabled = true;
+                RetryLoadButton.IsEnabled = true;
+                CancelGeminiButton.Visibility = Visibility.Collapsed;
+                SetLoading(false);
+                UpdateCreateButton();
+            }
+        }
+    }
+
     private void FormatDescription_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string marker }) return;
@@ -229,7 +316,7 @@ public sealed partial class CreateCardPage : Page
 
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
-        if (_submitting || _createdCard is not null || _submissionUncertain || _settings is null ||
+        if (_submitting || _generating || _createdCard is not null || _submissionUncertain || _settings is null ||
             _pageCancellation is null || _loadingBoards || _loadingBoardDetails || !CardForm.IsEnabled || !BoardDetails.IsEnabled || !TryGetDraft(out TrelloCardDraft draft)) return;
         CancellationToken token = _pageCancellation.Token;
         _submitting = true;
@@ -296,8 +383,13 @@ public sealed partial class CreateCardPage : Page
         }
     }
 
-    private void UpdateCreateButton() => CreateButton.IsEnabled = !_submitting && !_loadingBoards && !_loadingBoardDetails &&
-        _createdCard is null && !_submissionUncertain && CardForm.IsEnabled && BoardDetails.IsEnabled && ListComboBox.Items.Count > 0;
+    private void UpdateCreateButton()
+    {
+        bool available = !_submitting && !_generating && !_loadingBoards && !_loadingBoardDetails &&
+            _createdCard is null && !_submissionUncertain && CardForm.IsEnabled;
+        CreateButton.IsEnabled = available && BoardDetails.IsEnabled && ListComboBox.Items.Count > 0;
+        GenerateGeminiButton.IsEnabled = available;
+    }
 
     private void SetLoading(bool loading, string message = "")
     {

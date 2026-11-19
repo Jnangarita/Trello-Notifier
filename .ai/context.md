@@ -30,10 +30,15 @@ los filtros mediante `MonitorSnapshot.GetCardPage`, sin nuevas consultas ni avis
 y checklists usando el cliente compartido. Valida borradores en modelos; conserva
 resultados parciales en la vista y evita reenvíos tras una respuesta incierta. Los
 destinos se consultan bajo demanda; no hay borradores persistentes.
-`BulkCreateCardPage` importa CSV UTF-8 (hasta 2 MiB / 1000 filas), revisa y crea por
-lotes secuenciales con el mismo cliente. `CardCsvImporter` reutiliza TextFieldParser
-de .NET, valida fechas/usuarios y exporta resultados; `CardImportRow` guarda estados
+`BulkCreateCardPage` importa CSV UTF-8 (hasta 2 MiB / 1000 filas), revisa/edita/excluye
+y crea por lotes secuenciales con el mismo cliente. `CardCsvImporter` reutiliza
+TextFieldParser de .NET y exporta resultados; `CardBatchPreparer` comparte validación
+de fechas/usuarios y preparación con el origen IA. `CardImportRow` guarda estados
 en memoria para no reenviar creadas o inciertas. Se puede detener entre solicitudes.
+`GeminiCardClient` genera propuestas opcionales en ambas vistas, sin crear en Trello:
+JSON estructurado, 20 000 caracteres / 50 tarjetas / 1 MiB de respuesta / 60 s.
+La creación individual confirma el reemplazo del formulario; el lote lleva a revisión.
+Las páginas cancelan al salir; responsables/etiquetas se eligen con datos de Trello.
 `Styles.xaml` contiene los estilos compartidos.
 `DiagnosticsPage` consulta logs locales vía `AppLogReader`, con selector de archivo,
 filtro por nivel y colores del tema. Lee en segundo plano hasta 1000 líneas completas
@@ -49,8 +54,9 @@ de historial. `TrelloApiClient` usa `HttpClient` con timeout de 30 segundos.
 `SettingsStore` guarda configuración e historial en `trello-notifier.db` en el
 perfil local mediante Microsoft.Data.Sqlite 10.0.12. La primera apertura importa
 ambos JSON anteriores en una transacción y conserva los originales como respaldo;
-`user_version` impide reimportarlos. El esquema 2 añade `NotificationsEnabled`
-(activado por defecto) y migra el esquema 1 conservando los datos. Al desactivarlo,
+`user_version` impide reimportarlos. El esquema 3 añade `GeminiApiKey`/`GeminiModel`
+opcionales y migra los esquemas 1/2 conservando los datos. El esquema 2 incorporó
+`NotificationsEnabled` (activado por defecto). Al desactivarlo,
 el monitor sigue consultando tarjetas sin enviar ni registrar avisos. Los fallos no reinician datos. Las páginas
 y el monitor ejecutan el IO SQLite síncrono fuera del hilo UI. `DesktopNotificationService`
 encapsula las notificaciones de Windows y usa `App.GetAssetPath` para el icono.

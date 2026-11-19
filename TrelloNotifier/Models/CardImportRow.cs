@@ -8,6 +8,7 @@ public sealed record CardImportRow
     public string MemberSummary { get; init; } = "Sin asignar";
     public string? ParseError { get; init; }
     public string Message { get; init; } = string.Empty;
+    public string ReviewNote { get; init; } = string.Empty;
     public CardImportState State { get; init; } = CardImportState.Ready;
     public TrelloCard? CreatedCard { get; init; }
 

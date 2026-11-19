@@ -19,6 +19,8 @@
     <Compile Include="..\TrelloNotifier\Services\AppLog.cs" Link="Services\AppLog.cs" />
     <Compile Include="..\TrelloNotifier\Services\AppLogReader.cs" Link="Services\AppLogReader.cs" />
     <Compile Include="..\TrelloNotifier\Services\CardCsvImporter.cs" Link="Services\CardCsvImporter.cs" />
+    <Compile Include="..\TrelloNotifier\Services\CardBatchPreparer.cs" Link="Services\CardBatchPreparer.cs" />
+    <Compile Include="..\TrelloNotifier\Services\GeminiCardClient.cs" Link="Services\GeminiCardClient.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Roslyn ya forma parte del SDK .NET 9; solo se usa en los guards de arquitectura. -->

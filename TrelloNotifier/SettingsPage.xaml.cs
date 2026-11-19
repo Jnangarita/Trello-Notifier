@@ -34,6 +34,8 @@ public sealed partial class SettingsPage : Page
         ApiBaseUrlTextBox.Text = settings.ApiBaseUrl;
         ApiKeyPasswordBox.Password = settings.ApiKey;
         TokenPasswordBox.Password = settings.Token;
+        GeminiApiKeyPasswordBox.Password = settings.GeminiApiKey;
+        GeminiModelTextBox.Text = settings.GeminiModel;
         NotifyBeforeComboBox.SelectedItem = NotifyBeforeComboBox.Items
             .OfType<ComboBoxItem>()
             .FirstOrDefault(item => item.Tag?.ToString() == settings.NotifyBeforeMinutes.ToString());
@@ -146,6 +148,8 @@ public sealed partial class SettingsPage : Page
             ApiBaseUrl = ApiBaseUrlTextBox.Text.Trim(),
             ApiKey = ApiKeyPasswordBox.Password.Trim(),
             Token = TokenPasswordBox.Password.Trim(),
+            GeminiApiKey = GeminiApiKeyPasswordBox.Password.Trim(),
+            GeminiModel = GeminiModelTextBox.Text.Trim(),
             NotifyBeforeMinutes = int.TryParse(
                 (NotifyBeforeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out int notifyBeforeMinutes)
                 ? notifyBeforeMinutes : 0,
@@ -160,6 +164,12 @@ public sealed partial class SettingsPage : Page
             IncludeOverdueCards = IncludeOverdueCheckBox.IsChecked == true,
             Theme = (ThemeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Default"
         };
+
+        if (!string.IsNullOrEmpty(settings.GeminiApiKey) && GeminiCardClient.GetConfigurationError(settings) is string geminiError)
+        {
+            MainPage.Current?.ShowMessage(geminiError, InfoBarSeverity.Warning);
+            return false;
+        }
 
         if (!Uri.TryCreate(settings.ApiBaseUrl, UriKind.Absolute, out Uri? apiUri) ||
             (apiUri.Scheme != Uri.UriSchemeHttp && apiUri.Scheme != Uri.UriSchemeHttps))

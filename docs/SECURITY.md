@@ -19,6 +19,17 @@ se traducen sin incluir SQL, valores ni excepciones internas. Excluir también
 los archivos auxiliares `.db-journal`, `.db-wal` y `.db-shm`.
 
 ## Fronteras externas
+- Gemini es opcional y utiliza una clave independiente, también sin cifrar en SQLite.
+  Su `PasswordBox` solo oculta el valor en pantalla. El texto pegado se envía a Google
+  únicamente al generar, con fecha/zona horaria y contrato estructurado; no se envían
+  la configuración ni catálogos de Trello. Los datos pegados pueden ser privados:
+  la UI informa del envío antes de generar. No registrar texto, respuestas ni claves.
+- `GeminiCardClient` fija host HTTPS, desactiva redirecciones y valida el identificador
+  del modelo y la cabecera de autenticación. Limita entrada, bytes de respuesta y
+  duración incluso durante la lectura. Valida JSON y rechaza campos adicionales/IDs;
+  las propuestas no ejecutan acciones y se revisan antes de escribir en Trello.
+  No hay herramientas/function calling, navegación de URLs ni ejecución de Markdown.
+  Las pruebas inyectan `HttpMessageHandler` local con credenciales ficticias.
 - La URL configurable acepta HTTP/HTTPS. El cliente añade key/token si no están
   vacíos, también para hosts alternativos. Usar HTTPS con Trello; vaciar credenciales
   antes de probar un mock. No desactivar validación TLS.

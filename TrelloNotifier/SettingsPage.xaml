@@ -66,6 +66,18 @@
             </Border>
 
             <Border Style="{StaticResource PanelStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Gemini · Opcional" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="Convierte texto en propuestas editables. La creación manual y CSV funcionan sin Gemini." Style="{StaticResource CaptionTextStyle}" />
+                    <PasswordBox x:Name="GeminiApiKeyPasswordBox" Header="API key de Gemini" PasswordRevealMode="Hidden"
+                                 Style="{StaticResource InputPasswordBoxStyle}" />
+                    <TextBox x:Name="GeminiModelTextBox" Header="Modelo de Gemini" Style="{StaticResource InputTextBoxStyle}" />
+                    <HyperlinkButton Content="Obtener API key en Google AI Studio" NavigateUri="https://aistudio.google.com/apikey" Padding="0" />
+                    <TextBlock Text="Al generar, el texto se envía a Google Gemini. La API tiene cuotas y costes propios. La clave se guarda sin cifrar en la base local; ocultarla aquí no cifra el archivo." Style="{StaticResource CaptionTextStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource PanelStyle}">
                 <StackPanel Spacing="16">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                         <Border Style="{StaticResource AccentBadgeStyle}" Width="40" Height="40" Padding="0" CornerRadius="10">

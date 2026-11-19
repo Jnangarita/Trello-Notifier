@@ -31,6 +31,11 @@ public sealed partial class BulkCreateCardPage : Page
     private bool _started;
     private bool _running;
     private bool _stopRequested;
+    private bool _generating;
+    private bool _editing;
+    private bool _sourceIsAi;
+    private CancellationTokenSource? _geminiCancellation;
+    private ContentDialog? _editDialog;
 
     public BulkCreateCardPage()
     {
@@ -46,6 +51,8 @@ public sealed partial class BulkCreateCardPage : Page
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        _geminiCancellation?.Cancel();
+        _editDialog?.Hide();
         _boardCancellation?.Cancel();
         _boardCancellation?.Dispose();
         _boardCancellation = null;
@@ -68,7 +75,7 @@ public sealed partial class BulkCreateCardPage : Page
 
     private async Task LoadBoardsAsync()
     {
-        if (_pageCancellation is null || _loadingBoards || _started) return;
+        if (_pageCancellation is null || _loadingBoards || _started || _generating || _editing) return;
         CancellationToken token = _pageCancellation.Token;
         _loadingBoards = true;
         _boardCancellation?.Cancel();
@@ -172,7 +179,7 @@ public sealed partial class BulkCreateCardPage : Page
 
     private async void ChooseFile_Click(object sender, RoutedEventArgs e) => await ChooseFileAsync();
 
-    private bool CanReadCsv => _pageCancellation is not null && !_fileBusy && !_savingFile && !_loadingBoards && !_started && !_reviewing;
+    private bool CanReadCsv => _pageCancellation is not null && !_generating && !_editing && !_fileBusy && !_savingFile && !_loadingBoards && !_started && !_reviewing;
 
     private async Task ChooseFileAsync()
     {
@@ -246,8 +253,6 @@ public sealed partial class BulkCreateCardPage : Page
 
     private async Task ReadCsvFileAsync(StorageFile file, CancellationToken token)
     {
-        _sourceRows.Clear();
-        FileSummary.Text = "Leyendo archivo...";
         using IRandomAccessStreamWithContentType stream = await file.OpenReadAsync();
         if (stream.Size > CardCsvImporter.MaxFileBytes) throw new FormatException("El CSV no puede superar 2 MiB.");
         uint size = (uint)stream.Size;
@@ -259,6 +264,7 @@ public sealed partial class BulkCreateCardPage : Page
         List<CardImportRow> rows = await Task.Run(() => CardCsvImporter.Parse(text, token), token);
         token.ThrowIfCancellationRequested();
         _sourceRows = rows;
+        _sourceIsAi = false;
         SelectedFileName.Text = file.Name;
         ReviewFileName.Text = file.Name;
         FileSummary.Text = $"{rows.Count} filas detectadas · {Math.Max(1, (size + 1023) / 1024)} KiB";
@@ -267,7 +273,6 @@ public sealed partial class BulkCreateCardPage : Page
 
     private void ShowCsvReadError(Exception error)
     {
-        _sourceRows.Clear();
         if (error is FormatException)
             ShowMessage(error.Message, InfoBarSeverity.Warning);
         else
@@ -288,11 +293,157 @@ public sealed partial class BulkCreateCardPage : Page
     private void Destination_Changed(object sender, SelectionChangedEventArgs e) => UpdateActions();
     private void ExcludeInvalid_Changed(object sender, RoutedEventArgs e) => UpdateActions();
 
+    private void Source_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (GeminiInputPanel is null || CsvInputPanel is null) return;
+        bool ai = SourceComboBox.SelectedIndex == 1;
+        GeminiInputPanel.Visibility = ai ? Visibility.Visible : Visibility.Collapsed;
+        CsvInputPanel.Visibility = ai ? Visibility.Collapsed : Visibility.Visible;
+        CsvFieldsPanel.Visibility = ai ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void CancelGemini_Click(object sender, RoutedEventArgs e) => _geminiCancellation?.Cancel();
+
+    private async void GenerateGemini_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pageCancellation is null || _generating || _started || _reviewing || !GenerateGeminiButton.IsEnabled || !SetupPanel.IsEnabled) return;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_pageCancellation.Token);
+        _geminiCancellation = cancellation;
+        CancellationToken token = cancellation.Token;
+        _generating = true;
+        SetLoading(true, "Generando propuestas con Gemini...");
+        UpdateActions();
+        bool generated = false;
+        try
+        {
+            AppSettings settings = await Task.Run(AppServices.Settings.Load, token);
+            List<CardImportRow> rows = await AppServices.Gemini.GenerateAsync(settings, GeminiPromptTextBox.Text,
+                false, DateTimeOffset.Now, TimeZoneInfo.Local, token);
+            token.ThrowIfCancellationRequested();
+            _sourceRows = rows;
+            _sourceIsAi = true;
+            SelectedFileName.Text = ReviewFileName.Text = "Propuestas de Gemini";
+            FileSummary.Text = $"{rows.Count} propuestas · Revisa contenido y fechas antes de crear";
+            ShowMessage("Propuestas generadas. Revisa las fechas y selecciona los responsables en la app.", InfoBarSeverity.Informational);
+            generated = true;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // El origen anterior permanece disponible si se cancela la generación.
+        }
+        catch (Exception ex) when (ex is FormatException or HttpRequestException or JsonException or IOException or OperationCanceledException)
+        {
+            if (_pageCancellation?.IsCancellationRequested == false)
+            {
+                AppLog.WriteFailure("GenerateBulkGeminiCards", ex);
+                ShowMessage(GeminiCardClient.GetErrorMessage(ex), InfoBarSeverity.Warning);
+            }
+        }
+        finally
+        {
+            _geminiCancellation = null;
+            _generating = false;
+            if (_pageCancellation?.IsCancellationRequested == false)
+            {
+                SetLoading(false);
+                UpdateActions();
+                if (generated && ReviewButton.IsEnabled) Review_Click(sender, e);
+            }
+        }
+    }
+
+    private void RevalidateRows()
+    {
+        string listId = (ListComboBox.SelectedItem as TrelloList)?.Id ?? string.Empty;
+        string[] defaults = MembersList.SelectedItems.OfType<TrelloMember>().Select(member => member.Id).ToArray();
+        List<CardImportRow> validated = CardBatchPreparer.Prepare(_rows, listId, _members, defaults);
+        for (int index = 0; index < validated.Count; index++) _rows[index] = validated[index];
+    }
+
+    private void ExcludeRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (_started || _editing || sender is not HyperlinkButton { Tag: CardImportRow row }) return;
+        int index = _rows.IndexOf(row);
+        if (index < 0) return;
+        CardImportState state = row.State == CardImportState.Excluded ? CardImportState.Ready : CardImportState.Excluded;
+        _rows[index] = row with { State = state };
+        int sourceIndex = _sourceRows.FindIndex(source => source.RowNumber == row.RowNumber);
+        _sourceRows[sourceIndex] = _sourceRows[sourceIndex] with { State = state };
+        RevalidateRows();
+        UpdateActions();
+    }
+
+    private async void EditRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (_started || _editing || _pageCancellation is null || sender is not HyperlinkButton { Tag: CardImportRow row }) return;
+        CancellationToken token = _pageCancellation.Token;
+        int index = _rows.IndexOf(row);
+        if (index < 0) return;
+        var title = new TextBox { Header = "Título", Text = row.Draft.Name, TextWrapping = TextWrapping.Wrap };
+        var description = new TextBox { Header = "Descripción", Text = row.Draft.Description, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 100, MaxHeight = 180 };
+        var due = new TextBox { Header = "Vencimiento (ISO 8601 con zona, vacío = sin fecha)", Text = row.Draft.Due?.ToString("O") ?? "", PlaceholderText = "2026-12-05T09:00:00-05:00", MaxLength = 40 };
+        var members = new TextBox { Header = "Usuarios separados por ; (vacío = predeterminados)", Text = row.RequestedMembers };
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var fields = new StackPanel { Spacing = 12 };
+        fields.Children.Add(new TextBlock { Text = "Revisa todos los campos. Guardar sustituye los datos de esta fila y vuelve a validarlos. " + row.ReviewNote, TextWrapping = TextWrapping.Wrap });
+        foreach (UIElement element in new UIElement[] { title, description, due, members, error }) fields.Children.Add(element);
+        _editDialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            RequestedTheme = ActualTheme,
+            Title = $"Editar tarjeta {row.RowNumber}",
+            Content = new ScrollViewer { Content = fields, MaxHeight = 420 },
+            PrimaryButtonText = "Guardar cambios",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        CardImportRow? edited = null;
+        _editDialog.PrimaryButtonClick += (_, args) =>
+        {
+            try
+            {
+                var candidate = row with
+                {
+                    Draft = new TrelloCardDraft { Name = title.Text.Trim(), Description = description.Text, Due = CardBatchPreparer.ParseDue(due.Text) },
+                    RequestedMembers = members.Text.Trim(),
+                    ParseError = null,
+                    Message = string.Empty,
+                    ReviewNote = string.Empty,
+                    State = CardImportState.Ready
+                };
+                string[] defaults = MembersList.SelectedItems.OfType<TrelloMember>().Select(member => member.Id).ToArray();
+                CardImportRow validated = CardBatchPreparer.Prepare(new[] { candidate }, (ListComboBox.SelectedItem as TrelloList)?.Id ?? "", _members, defaults)[0];
+                if (validated.State == CardImportState.Invalid) throw new FormatException(validated.Message);
+                edited = validated with { State = row.State == CardImportState.Excluded ? CardImportState.Excluded : CardImportState.Ready };
+            }
+            catch (FormatException ex)
+            {
+                error.Text = ex.Message;
+                args.Cancel = true;
+            }
+        };
+        _editing = true;
+        UpdateActions();
+        try
+        {
+            if (await _editDialog.ShowAsync() != ContentDialogResult.Primary || token.IsCancellationRequested || edited is null) return;
+            _rows[index] = edited;
+            int sourceIndex = _sourceRows.FindIndex(source => source.RowNumber == row.RowNumber);
+            _sourceRows[sourceIndex] = edited;
+        }
+        finally
+        {
+            _editing = false;
+            _editDialog = null;
+            if (!token.IsCancellationRequested) UpdateActions();
+        }
+    }
+
     private void Review_Click(object sender, RoutedEventArgs e)
     {
         if (!ReviewButton.IsEnabled || ListComboBox.SelectedItem is not TrelloList list) return;
         string[] defaults = MembersList.SelectedItems.OfType<TrelloMember>().Select(member => member.Id).ToArray();
-        List<CardImportRow> prepared = CardCsvImporter.Prepare(_sourceRows, list.Id, _members, defaults);
+        List<CardImportRow> prepared = CardBatchPreparer.Prepare(_sourceRows, list.Id, _members, defaults);
         _rows.Clear();
         foreach (CardImportRow row in prepared) _rows.Add(row);
         _reviewing = true;
@@ -304,7 +455,7 @@ public sealed partial class BulkCreateCardPage : Page
 
     private void EditSource_Click(object sender, RoutedEventArgs e)
     {
-        if (_started) return;
+        if (_started || _editing) return;
         _reviewing = false;
         UpdateActions();
     }
@@ -319,10 +470,16 @@ public sealed partial class BulkCreateCardPage : Page
 
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
-        if (_running || !CreateButton.IsEnabled || _settings is null || _pageCancellation is null) return;
+        if (_running || _editing || _generating || !CreateButton.IsEnabled || _settings is null || _pageCancellation is null) return;
         CancellationToken token = _pageCancellation.Token;
         if (!_started)
         {
+            RevalidateRows();
+            if (_rows.Any(row => row.State == CardImportState.Invalid) && ExcludeInvalidCheckBox.IsChecked != true)
+            {
+                UpdateActions();
+                return;
+            }
             for (int index = 0; index < _rows.Count; index++)
                 if (_rows[index].State == CardImportState.Invalid)
                     _rows[index] = _rows[index] with { State = CardImportState.Excluded };
@@ -461,6 +618,10 @@ public sealed partial class BulkCreateCardPage : Page
         if (control.DataContext is not CardImportRow row) return;
         VisualStateManager.GoToState(control, row.State.ToString(), false);
         VisualStateManager.GoToState(control, _started ? "ResultRow" : "PreviewRow", false);
+        if (control.FindName("ReviewRowActions") is StackPanel actions)
+            actions.Visibility = _started ? Visibility.Collapsed : Visibility.Visible;
+        if (control.FindName("ExcludeRowButton") is HyperlinkButton exclude)
+            exclude.Content = row.State == CardImportState.Excluded ? "Incluir" : "Excluir";
         if (control.FindName("RowMessage") is TextBlock message)
             message.Visibility = row.State is CardImportState.Invalid or CardImportState.Rejected or CardImportState.Uncertain or CardImportState.Excluded
                 ? Visibility.Visible : Visibility.Collapsed;
@@ -481,12 +642,14 @@ public sealed partial class BulkCreateCardPage : Page
     {
         // SelectionChanged puede ejecutarse durante InitializeComponent.
         if (ReviewButton is null) return;
-        bool busy = _loadingBoards || _loadingMembers || _fileBusy || _savingFile;
-        SetupPanel.IsEnabled = !_started && !_loadingBoards && !_fileBusy && !_savingFile;
+        bool busy = _loadingBoards || _loadingMembers || _fileBusy || _savingFile || _generating || _editing;
+        SetupPanel.IsEnabled = !_started && !_loadingBoards && !_fileBusy && !_savingFile && !_generating && !_editing;
+        GenerateGeminiButton.IsEnabled = !busy && !_started && !_reviewing;
+        CancelGeminiButton.Visibility = _generating ? Visibility.Visible : Visibility.Collapsed;
         SetupPanel.Visibility = _reviewing ? Visibility.Collapsed : Visibility.Visible;
         ReviewPanel.Visibility = _reviewing ? Visibility.Visible : Visibility.Collapsed;
         ReviewButton.Visibility = _reviewing ? Visibility.Collapsed : Visibility.Visible;
-        ReviewButton.IsEnabled = !busy && _sourceRows.Count > 0 && _membersLoaded && ListComboBox.SelectedItem is TrelloList;
+        ReviewButton.IsEnabled = !_started && !busy && _sourceRows.Count > 0 && _membersLoaded && ListComboBox.SelectedItem is TrelloList;
         ReviewButton.Content = _sourceRows.Count == 0 ? "Revisar tarjetas →" : $"Revisar {_sourceRows.Count} tarjetas →";
         SelectedFilePanel.Visibility = _sourceRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         ReloadButton.IsEnabled = !_loadingBoards;
@@ -514,7 +677,7 @@ public sealed partial class BulkCreateCardPage : Page
         ProgressText.Visibility = _running || busy ? Visibility.Visible : Visibility.Collapsed;
         PageDescription.Text = _started ? "Consulta qué tarjetas se crearon y recupera las que quedaron pendientes."
             : _reviewing ? "Comprueba los datos y resuelve los errores antes de enviar a Trello."
-            : "Importa un CSV y elige dónde se crearán tus tarjetas.";
+            : "Importa un CSV o genera propuestas con Gemini y elige el destino.";
         FooterHint.Text = _started ? eligible > 0
                 ? "Solo se reenviarán pendientes o rechazadas. Descarga los resultados antes de salir."
                 : "Descarga los resultados antes de iniciar otra importación o salir."
@@ -538,7 +701,7 @@ public sealed partial class BulkCreateCardPage : Page
         ValidationInfoBar.IsOpen = _reviewing && !_started && invalid > 0;
         ValidationInfoBar.Visibility = ValidationInfoBar.IsOpen ? Visibility.Visible : Visibility.Collapsed;
         ValidationInfoBar.Title = $"Hay {invalid} fila(s) que necesitan corrección.";
-        CorrectFileButton.Visibility = _reviewing && !_started && invalid > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CorrectFileButton.Visibility = _reviewing && !_started && !_sourceIsAi && invalid > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (!_started)
         {
             ReadCountText.Text = $"{_rows.Count} filas leídas";
