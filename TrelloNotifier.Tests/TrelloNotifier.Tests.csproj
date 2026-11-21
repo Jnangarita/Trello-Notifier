@@ -17,6 +17,7 @@
     <Compile Include="..\TrelloNotifier\Services\SettingsStore.cs" Link="Services\SettingsStore.cs" />
     <Compile Include="..\TrelloNotifier\Services\DueCardMonitor.cs" Link="Services\DueCardMonitor.cs" />
     <Compile Include="..\TrelloNotifier\Services\AppLog.cs" Link="Services\AppLog.cs" />
+    <Compile Include="..\TrelloNotifier\Services\CompactLogEnricher.cs" Link="Services\CompactLogEnricher.cs" />
     <Compile Include="..\TrelloNotifier\Services\AppLogReader.cs" Link="Services\AppLogReader.cs" />
     <Compile Include="..\TrelloNotifier\Services\CardCsvImporter.cs" Link="Services\CardCsvImporter.cs" />
     <Compile Include="..\TrelloNotifier\Services\CardBatchPreparer.cs" Link="Services\CardBatchPreparer.cs" />

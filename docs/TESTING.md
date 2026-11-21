@@ -10,7 +10,7 @@ el cliente Gemini real se enlaza con un `HttpMessageHandler` simulado, sin red.
 Los 11 casos originales cubren calendario/límites, intervalos, preferencias,
 migración de historial, agrupación, concurrencia entre comprobaciones,
 reinicio, avisos rechazados, vencidas, fallo de API y cambios de fecha.
-Los casos del monitor son integración local de fuentes reales con JSON temporal
+Los casos del monitor son integración local de fuentes reales con SQLite temporal
 y dobles, no integración contra Windows ni Trello.
 La consulta por estados añade cobertura de clasificación y límites temporales,
 presentación de completadas/sin fecha y publicación de todas las asignadas sin
@@ -60,6 +60,13 @@ corregir una fecha inválida, excluir/incluir y volver al origen conservando cam
 Comprobar clave ausente, error HTTP, generación cancelada, navegación durante carga,
 doble clic, no reenvío de éxitos/inciertos y bloqueo de edición tras iniciar envíos.
 Revisar configuración, diálogos, scroll, foco, temas, contraste y escalado.
+
+### Resultados históricos (no describen una ejecución actual)
+
+Los resultados siguientes corresponden a sus fechas y entornos. Antes de reutilizar
+un bloqueo o dar una comprobación por superada, volver a ejecutar los comandos
+pertinentes. El [estado y los problemas conocidos](KNOWN_ISSUES.md) distingue las
+limitaciones vigentes de las ya corregidas; estos resultados no son una lista de deuda.
 
 Validación de esta implementación (17/11/2026): el build WinUI pasó sin errores ni
 advertencias. Un runner temporal enlazó las mismas fuentes y ejecutó 67 casos bajo
@@ -259,7 +266,11 @@ timeouts se distinguen, que un destino inaccesible no impide usar persistencia
 y que el monitor correlaciona fallo/recuperación sin falsas alarmas al cancelar.
 Los errores usan secretos ficticios en Message, Data y excepciones internas
 para verificar su ausencia en los archivos de texto; también se comprueba la cabecera
-tipo Spring Boot, el componente y la correlación. No se leen logs ni configuración del usuario.
+compacta, la compatibilidad con archivos antiguos, el componente corto y la correlación.
+Se verifica aislamiento de scopes paralelos, conservación de propiedades completas,
+conteos de avisos agrupados/cooldown/deduplicación/desactivación/rechazo, reducción
+de rutina a Debug y espera de una comprobación manual durante el cierre.
+No se leen logs ni configuración del usuario.
 No se consulta la API real ni se emiten notificaciones Windows en estas pruebas.
 
 Comprobación manual de diagnóstico: iniciar la app con un mock sin credenciales,

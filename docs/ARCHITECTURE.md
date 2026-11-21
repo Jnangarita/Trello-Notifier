@@ -72,11 +72,16 @@ creados/excluidos/inciertos. Gemini no recibe servicios de Trello ni accede a SQ
 El esquema SQLite 3 añade `GeminiApiKey` y `GeminiModel`; migra v1/v2 transaccionalmente.
 
 `App` inicializa `Services/AppLog` antes de usar `AppServices` y vacía Serilog al
-cerrar o ante un fallo fatal. Los servicios y las fronteras de UI usan el logger
+cerrar o ante un fallo fatal. El cierre normal de ventana espera `Monitor.StopAsync()`
+antes de disponer notificaciones y vaciar el logger; `ProcessExit` es un respaldo.
+Los servicios y las fronteras de UI usan el logger
 compartido; modelos y calendario siguen sin logging. `AppLog` configura texto `.log` en
 LocalAppData con Serilog File + Async (cola limitada no bloqueante), limita los
 datos de excepción a propiedades técnicas y observa fallos internos sin copiar
-su contenido. `LogContext` propaga `CheckId` dentro de una comprobación. Los
+su contenido. `LogContext` propaga `SessionId` al arrancar y `CheckId` dentro de una
+comprobación; una propiedad global de sesión respalda callbacks nativos sin contexto.
+`CompactLogEnricher` añade el nombre corto y la correlación de presentación sin
+modificar las propiedades originales. El lector admite cabeceras nuevas y antiguas. Los
 errores se registran donde se capturan y los servicios añaden resultados/tiempos.
 No se incorpora un contenedor DI ni persistencia de logs en SQLite.
 

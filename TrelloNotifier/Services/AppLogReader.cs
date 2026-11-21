@@ -81,7 +81,31 @@ internal sealed class AppLogReader
 
     internal static DiagnosticLogEntry ParseLine(string line)
     {
-        var unrecognized = new DiagnosticLogEntry { Message = line };
+        var unrecognized = new DiagnosticLogEntry { RawLine = line, Message = line };
+        Match compact = Regex.Match(line,
+            @"^(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}) \[(?<level>VRB|DBG|INF|WRN|ERR|FTL)\] \[(?<ids>s:[^\]\s]+(?: c:[^\]\s]+)?)\] (?<source>[^:]+): (?<message>.*)$",
+            RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (compact.Success && DateTimeOffset.TryParseExact(compact.Groups["time"].Value,
+            "yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset compactTime))
+        {
+            return new DiagnosticLogEntry
+            {
+                RawLine = line,
+                Timestamp = compactTime,
+                Level = compact.Groups["level"].Value switch
+                {
+                    "VRB" => "TRACE",
+                    "DBG" => "DEBUG",
+                    "INF" => "INFO",
+                    "WRN" => "WARN",
+                    "ERR" => "ERROR",
+                    _ => "FATAL"
+                },
+                Source = compact.Groups["source"].Value,
+                Message = $"[{compact.Groups["ids"].Value}] {compact.Groups["message"].Value}"
+            };
+        }
+        // Conservar la lectura de archivos de versiones anteriores durante la retención.
         int headerEnd = line.IndexOf(HeaderSeparator, StringComparison.Ordinal);
         if (headerEnd < 0) return unrecognized;
         string[] header = line[..headerEnd].Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -94,6 +118,7 @@ internal sealed class AppLogReader
         if (messageStart < 0) return unrecognized;
         return new DiagnosticLogEntry
         {
+            RawLine = line,
             Timestamp = timestamp,
             Level = header[1] switch { "INFOR" => "INFO", "WARNI" => "WARN", _ => header[1] },
             Source = line[sourceStart..messageStart].Trim(),

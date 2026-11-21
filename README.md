@@ -104,6 +104,8 @@ Abre **Diagnóstico** en el menú lateral para consultar los logs dentro de la a
 Selecciona un archivo y filtra por nivel: **INFO** en azul, **WARN** en amarillo,
 **ERROR/FATAL** en rojo; **DEBUG/TRACE** y líneas sin cabecera se muestran en tono neutro.
 Cada fila muestra fecha/hora local, componente y mensaje seleccionable para copiar.
+El botón **Copiar** de cada registro copia la línea original completa al portapapeles,
+incluidos fecha y zona horaria, nivel, componente e identificadores de correlación.
 **Actualizar** renueva la lista de archivos y los registros del archivo seleccionado;
 la vista carga al entrar y no realiza sondeo automático.
 
@@ -118,21 +120,28 @@ Los logs se guardan automáticamente en:
 %LOCALAPPDATA%\Trello Notifier\Logs\trello-notifier-AAAAMMDD.log
 ```
 
-Al iniciar la aplicación se escribe un banner ASCII de Trello Notifier con la
-versión del ensamblado y el lema «Tus pendientes, a tiempo.». Se registra una vez
-por ejecución, como un evento de inicio multilínea en el mismo archivo `.log`.
+Al iniciar la aplicación se registra una única línea con la versión del ensamblado:
+`Aplicación iniciada. Versión 1.1.1`. El registro incluye fecha, nivel y componente,
+sin banner ASCII ni filas adicionales sin fecha en Diagnóstico. Los banners de
+ejecuciones anteriores permanecen en los archivos antiguos hasta su rotación.
 
-Los eventos usan texto con un formato similar al de Spring Boot: fecha ISO 8601,
-nivel (`INFO`, `WARN`, `ERROR`, `DEBUG`, `FATAL`), PID, aplicación, componente y
-mensaje. Por ejemplo, con identificadores ficticios:
+Los eventos usan texto compacto: fecha con zona horaria, nivel (`INF`, `WRN`,
+`ERR`, `DBG`, `FTL`), correlación, nombre corto del componente y mensaje.
+Por ejemplo, con identificadores ficticios:
 
 ```text
-2026-10-05T14:30:00.123-05:00  INFO 1234 --- [TrelloNotifier] TrelloNotifier.Services.DueCardMonitor            : Comprobación finalizada: Succeeded; duración 420 ms [session=0123456789abcdef0123456789abcdef check=abcdef0123456789abcdef0123456789]
+2026-11-21 14:30:00.123 -05:00 [INF] [s:45120f6a] DueCardMonitor: Monitor iniciado
+2026-11-21 14:30:01.462 -05:00 [INF] [s:45120f6a c:9b996914] DueCardMonitor: Evaluadas: 38 | Candidatas: 3 | Avisos enviados: 0 (3 en cooldown) (1339 ms)
 ```
 
 Se registran inicio, versión, cierre normal, resultados HTTP, comprobaciones del monitor, envío de
-avisos y fallos. `session` identifica la ejecución y `check` relaciona los
-eventos de una comprobación. Que Windows acepte un aviso no demuestra que el
+avisos y fallos. `s:` identifica la ejecución y `c:` relaciona los eventos de una
+comprobación; se muestran ocho caracteres y se omite `c:` fuera del ciclo.
+`SessionId`, `CheckId` y `SourceContext` conservan sus valores completos como
+propiedades del evento. Los GET correctos y ciclos sin candidatos ni cambios
+quedan en Debug. El resumen diferencia notificaciones agrupadas, tarjetas
+notificadas, cooldown, deduplicación y preferencias desactivadas.
+Que Windows acepte un aviso no demuestra que el
 usuario lo haya visto.
 
 - Rotación diaria y al alcanzar aproximadamente **5 MiB**; se conservan los
@@ -142,9 +151,11 @@ usuario lo haya visto.
   de entorno `TRELLO_NOTIFIER_LOG_LEVEL=Debug` antes de iniciar la aplicación.
   Al quitarla y reiniciar se vuelve al nivel normal. No cambia la base de datos.
 - Escritura en segundo plano con cola de 1000 eventos. Si se llena, se descartan
-  nuevos eventos para no bloquear la interfaz. El cierre normal vacía la cola;
+  nuevos eventos para no bloquear la interfaz. Vaciado a disco cada segundo;
+  el cierre normal espera al monitor y vacía la cola con `Log.CloseAndFlush()`;
   un cierre forzado puede perder los últimos eventos.
-- No se registran credenciales, URLs, contenido de tarjetas, configuración ni
+- HTTP registra método, plantilla de ruta sin IDs privados, estado y duración.
+  No se registran credenciales, URLs completas, contenido de tarjetas, configuración ni
   mensajes completos de excepciones. Los errores conservan operación, tipo,
   código y métodos de la app, sin rutas de archivos ni excepciones internas.
 - Un fallo del logger no impide usar la aplicación. Si se detecta al arrancar,
@@ -414,6 +425,10 @@ de completado o archivado. No se guardan nuevas tablas ni datos históricos loca
 
 Empieza por [AGENTS.md](AGENTS.md) y el [contexto mínimo](.ai/context.md).
 Consulta solo la documentación específica necesaria para la tarea.
+El [estado actual y los problemas conocidos](docs/KNOWN_ISSUES.md) distingue
+hallazgos resueltos, parciales y pendientes con evidencia. Contrasta los informes
+y planes antiguos con esa referencia y el código antes de asumir que un problema
+sigue presente.
 
 El proyecto incluye dos skills de OpenCode en `.opencode/skills/`:
 

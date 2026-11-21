@@ -100,10 +100,18 @@
                                         <Grid ColumnDefinitions="4,*">
                                             <Border x:Name="RowAccent" Background="{ThemeResource AppTextSecondaryBrush}" CornerRadius="8,0,0,8" />
                                             <StackPanel Grid.Column="1" Margin="12" Spacing="6">
-                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                                    <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionTextStyle}" />
+                                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                                                    <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
                                                     <TextBlock x:Name="LevelText" Grid.Column="1" Text="{Binding Level}" FontWeight="SemiBold"
-                                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                               Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="2" Style="{StaticResource ActionButtonStyle}" Padding="10,6"
+                                                            Click="CopyLog_Click" AutomationProperties.Name="Copiar línea de log"
+                                                            ToolTipService.ToolTip="Copiar la línea completa al portapapeles">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                                                            <TextBlock Text="Copiar" />
+                                                        </StackPanel>
+                                                    </Button>
                                                 </Grid>
                                                 <TextBlock Text="{Binding Source}" Style="{StaticResource CaptionTextStyle}" IsTextSelectionEnabled="True" />
                                                 <TextBlock Text="{Binding Message}" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap"

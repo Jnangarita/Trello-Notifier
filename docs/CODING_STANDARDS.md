@@ -22,7 +22,7 @@ HTTP no exitoso produce `HttpRequestException`. El monitor publica errores en
 esperada no es un fallo de negocio. Persistencia informa errores mediante
 `IOException` y no reinicia datos ante fallos de SQLite o de importación JSON.
 No agregar catches vacíos generalizados ni cambiar esta política inadvertidamente.
-Serilog escribe texto `.log` estilo Spring Boot mediante `AppLog`, con File y Async para rotación y
+Serilog escribe texto `.log` compacto mediante `AppLog`, con File y Async para rotación y
 cola limitada. Usar plantillas constantes y propiedades técnicas o conteos.
 Registrar errores una vez en la frontera que los captura (monitor, página o
 manejador global) con `AppLog.WriteFailure`, nunca pasando la excepción a Serilog
@@ -32,9 +32,13 @@ resultados, tiempos y conteos sin repetir el error. La inicialización de
 notificaciones registra el error que absorbe. La cancelación solicitada no se
 registra como fallo; los timeouts se registran como Warning.
 Usar `Log.ForContext<T>()` para identificar el componente. La plantilla muestra
-fecha, nivel, PID, aplicación, componente, mensaje y correlación. `WriteFailure`
+fecha con zona, nivel de tres letras, correlación abreviada y componente corto.
+`CompactLogEnricher` conserva los valores completos de `SourceContext`, `SessionId`
+y `CheckId`; usar `LogContext` para correlación, sin añadir IDs al mensaje.
+GET correctos y ciclos sin candidatos ni cambios se registran en Debug. `WriteFailure`
 reduce CallerFilePath al nombre del componente, sin escribir la ruta de compilación.
-No registrar URLs, configuración ni payloads con información privada.
+Para HTTP usar plantillas de rutas permitidas sin IDs ni query, nunca nombres CLR genéricos.
+No registrar URLs completas, configuración ni payloads con información privada.
 
 ## Funciones, constantes, DTOs y mapeo
 Mantener funciones enfocadas y parámetros explícitos; las reglas temporales

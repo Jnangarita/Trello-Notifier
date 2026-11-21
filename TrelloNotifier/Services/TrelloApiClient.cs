@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Serilog;
+using Serilog.Events;
 using TrelloNotifier.Models;
 
 namespace TrelloNotifier.Services;
@@ -145,6 +146,8 @@ internal sealed class TrelloApiClient
         var stopwatch = Stopwatch.StartNew();
         int? statusCode = null;
         bool succeeded = false;
+        string outcome = "fallo de transporte";
+        LogEventLevel failureLevel = LogEventLevel.Error;
         try
         {
             using var request = new HttpRequestMessage(method, url);
@@ -153,6 +156,8 @@ internal sealed class TrelloApiClient
             statusCode = (int)response.StatusCode;
             if (!response.IsSuccessStatusCode)
             {
+                outcome = "solicitud rechazada";
+                failureLevel = statusCode >= 500 ? LogEventLevel.Error : LogEventLevel.Warning;
                 throw new HttpRequestException("Trello no pudo completar la solicitud. Revisa la conexión y los permisos.",
                     null, response.StatusCode);
             }
@@ -161,11 +166,51 @@ internal sealed class TrelloApiClient
             succeeded = true;
             return result;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            outcome = "cancelada por solicitud";
+            failureLevel = LogEventLevel.Warning;
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = "tiempo de espera agotado";
+            failureLevel = LogEventLevel.Warning;
+            throw;
+        }
+        catch (JsonException)
+        {
+            outcome = "respuesta JSON inválida";
+            failureLevel = LogEventLevel.Warning;
+            throw;
+        }
         finally
         {
-            // El tipo identifica el recurso sin registrar URL, query, host ni respuesta.
-            Log.ForContext<TrelloApiClient>().Information("Solicitud HTTP {Method} {ResourceType}: estado {StatusCode}; éxito {Succeeded}; cancelada {Cancelled}; duración {DurationMs} ms",
-                method.Method, typeof(T).Name, statusCode, succeeded, cancellationToken.IsCancellationRequested, stopwatch.ElapsedMilliseconds);
+            string route = GetLogResource(resource);
+            if (succeeded)
+                Log.ForContext<TrelloApiClient>().Write(method == HttpMethod.Get ? LogEventLevel.Debug : LogEventLevel.Information,
+                    "{Method} {Resource} -> {StatusCode} ({DurationMs} ms)", method.Method, route, statusCode, stopwatch.ElapsedMilliseconds);
+            else
+                Log.ForContext<TrelloApiClient>().ForContext("StatusCode", statusCode).Write(failureLevel,
+                    "{Method} {Resource} -> {HttpResult} ({DurationMs} ms): {Outcome}", method.Method, route,
+                    statusCode?.ToString(CultureInfo.InvariantCulture) ?? "sin respuesta", stopwatch.ElapsedMilliseconds, outcome);
         }
+    }
+
+    internal static string GetLogResource(string resource)
+    {
+        // Rutas permitidas: nunca escribir IDs privados, query, credenciales ni host del usuario.
+        string path = resource.Split('?')[0];
+        if (path.StartsWith("boards/", StringComparison.Ordinal) && path.EndsWith("/members", StringComparison.Ordinal)) return "/boards/{id}/members";
+        if (path.StartsWith("boards/", StringComparison.Ordinal) && path.EndsWith("/labels", StringComparison.Ordinal)) return "/boards/{id}/labels";
+        if (path.StartsWith("checklists/", StringComparison.Ordinal) && path.EndsWith("/checkItems", StringComparison.Ordinal)) return "/checklists/{id}/checkItems";
+        return path switch
+        {
+            "members/me/cards" => "/members/me/cards",
+            "members/me/boards" => "/members/me/boards",
+            "cards" => "/cards",
+            "checklists" => "/checklists",
+            _ => "/recurso-no-identificado"
+        };
     }
 }

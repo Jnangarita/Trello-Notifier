@@ -2,6 +2,7 @@ namespace TrelloNotifier.Models;
 
 public sealed record DiagnosticLogEntry
 {
+    public string RawLine { get; init; } = string.Empty;
     public DateTimeOffset? Timestamp { get; init; }
     public string Level { get; init; } = "OTRO";
     public string Source { get; init; } = string.Empty;

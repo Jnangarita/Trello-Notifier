@@ -5,7 +5,9 @@ UNDERSTAND → SEARCH → REUSE → PLAN → IMPLEMENT → TEST → REVIEW
 ```
 
 1. **UNDERSTAND**: leer `AGENTS.md` y `.ai/context.md`; concretar aceptación y
-   restricciones. Consultar solo documentación necesaria.
+   restricciones. Consultar solo documentación necesaria. Si la tarea parte de un
+   hallazgo antiguo, contrastarlo con el estado en `docs/KNOWN_ISSUES.md`, el código
+   y los tests actuales antes de considerarlo pendiente.
 2. **SEARCH**: buscar símbolos/archivos relevantes, después instrucciones locales
    y tests. Por ejemplo: `rg -n "ShouldNotify|GetEligibleCards" TrelloNotifier TrelloNotifier.Tests`.
    Si `rg` no está en PATH, usar la búsqueda de símbolos/contenido del agente o
@@ -19,9 +21,11 @@ UNDERSTAND → SEARCH → REUSE → PLAN → IMPLEMENT → TEST → REVIEW
    comprobar manualmente en Windows. No usar secretos ni red real en tests.
 7. **REVIEW**: usar la checklist, revisar el diff (o archivos cambiados si no hay
    Git), declarar resultados reales y bloqueos. Separar deuda previa de regresiones.
+   Actualizar los problemas conocidos afectados con estado, fecha y evidencia;
+   no presentar resultados históricos como validación del cambio actual.
 
 ## Exclusiones compatibles
-`.ignore` aplica a búsquedas con ripgrep incluso en esta copia sin `.git`;
+`.ignore` aplica a búsquedas con ripgrep, también fuera de un repositorio Git;
 `.gitignore` protege las rutas habituales al versionar. No hay configuración
 previa de un agente/editor con un formato de exclusión propio comprobado.
 No se presupone soporte universal de `.aiignore`. En herramientas que no respeten

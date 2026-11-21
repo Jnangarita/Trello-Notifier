@@ -67,6 +67,17 @@ inicializa y vacía el logger; `CheckId` correlaciona el monitor. Registrar erro
 con `AppLog.WriteFailure` (tipo/código/métodos sin mensajes ni rutas), no pasar
 excepciones completas a Serilog. `TRELLO_NOTIFIER_LOG_LEVEL=Debug` habilita detalle.
 
+## Estado actual frente a diagnósticos históricos
+Consultar [estado y problemas conocidos](../docs/KNOWN_ISSUES.md) para distinguir
+resueltos, parciales y pendientes (revisión de fuentes: 21/11/2026). La persistencia
+JSON habitual, `crash.log`, la excepción de lint de `MainPage` y la pérdida de
+`StatusCode` HTTP ya se sustituyeron o corrigieron. No tratarlos como deuda activa.
+Antes de corregir un hallazgo de un plan o informe antiguo, comprobar código y
+tests actuales; los planes no prueban que el problema siga presente ni que una
+validación se haya ejecutado. Actualizar esa referencia cuando cambie su estado.
+Los bloqueos de SDK y resultados de pruebas son propios de la fecha/entorno
+registrados: volver a comprobarlos antes de asumirlos vigentes.
+
 ## Restricciones que suelen importar
 Reutilizar antes de extender o crear. Mantener modelos sin dependencias de UI o
 servicios y calendario sin IO. No duplicar selección de tarjetas, intervalos,
@@ -87,7 +98,7 @@ generados, `bin/`, `obj/`, `artifacts/` ni configuraciones de IDE como contexto.
 Leer solo según la tarea: [arquitectura](../docs/ARCHITECTURE.md),
 [ubicaciones](../docs/PROJECT_STRUCTURE.md), [código](../docs/CODING_STANDARDS.md),
 [tests/CI](../docs/TESTING.md), [seguridad](../docs/SECURITY.md),
-[API](../docs/API_GUIDELINES.md), [deuda previa](../docs/KNOWN_ISSUES.md).
+[API](../docs/API_GUIDELINES.md), [estado y problemas conocidos](../docs/KNOWN_ISSUES.md).
 Proceso: [workflow](workflow.md); cierre: [checklist](review-checklist.md);
 nueva tarea: [plantilla](task-template.md). No cargar todos estos documentos
 por defecto.

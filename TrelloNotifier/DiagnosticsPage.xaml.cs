@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using TrelloNotifier.Models;
 using TrelloNotifier.Services;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace TrelloNotifier;
 
@@ -32,6 +33,24 @@ public sealed partial class DiagnosticsPage : Page
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await LoadLogsAsync(refreshFiles: true);
+
+    private void CopyLog_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: DiagnosticLogEntry entry }) return;
+        try
+        {
+            var content = new DataPackage();
+            content.SetText(entry.RawLine);
+            Clipboard.SetContent(content);
+            Clipboard.Flush();
+            ShowMessage("Línea de log copiada al portapapeles.", InfoBarSeverity.Success);
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            AppLog.WriteFailure("CopyDiagnosticLog", ex);
+            ShowMessage("No se pudo copiar la línea. Vuelve a intentarlo.", InfoBarSeverity.Error);
+        }
+    }
 
     private async void File_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

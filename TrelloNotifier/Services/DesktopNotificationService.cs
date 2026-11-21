@@ -71,7 +71,10 @@ internal sealed class DesktopNotificationService : IDisposable
 
         AppNotification notification = builder.BuildNotification();
         AppNotificationManager.Default.Show(notification);
-        Log.ForContext<DesktopNotificationService>().Information("Envío de aviso a Windows: aceptado {Accepted}; tarjetas {CardCount}", notification.Id != 0, cards.Count);
+        if (notification.Id != 0)
+            Log.ForContext<DesktopNotificationService>().Information("Aviso enviado a Windows para {CardCount} tarjeta(s)", cards.Count);
+        else
+            Log.ForContext<DesktopNotificationService>().Warning("Windows rechazó el aviso para {CardCount} tarjeta(s)", cards.Count);
         return notification.Id != 0;
     }
 
@@ -96,7 +99,10 @@ internal sealed class DesktopNotificationService : IDisposable
 
         AppNotification notification = builder.BuildNotification();
         AppNotificationManager.Default.Show(notification);
-        Log.ForContext<DesktopNotificationService>().Information("Envío de aviso de prueba a Windows: aceptado {Accepted}", notification.Id != 0);
+        if (notification.Id != 0)
+            Log.ForContext<DesktopNotificationService>().Information("Aviso de prueba enviado a Windows");
+        else
+            Log.ForContext<DesktopNotificationService>().Warning("Windows rechazó el aviso de prueba");
         return notification.Id != 0;
     }
 

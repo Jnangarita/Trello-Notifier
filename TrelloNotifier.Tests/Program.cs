@@ -1401,7 +1401,9 @@ await Run("Diagnóstico: interpreta cabeceras y distingue nivel de palabras del 
         ("INFOR", "INFO", "Info"), ("WARNI", "WARN", "Warning")
     })
     {
-        DiagnosticLogEntry entry = AppLogReader.ParseLine($"{timestamp} {level,5} 123 --- [TrelloNotifier] Componente   : Mensaje con ERROR y WARN [session=prueba check=]");
+        string rawLine = $"{timestamp} {level,5} 123 --- [TrelloNotifier] Componente   : Mensaje con ERROR y WARN [session=prueba check=]";
+        DiagnosticLogEntry entry = AppLogReader.ParseLine(rawLine);
+        Check(entry.RawLine == rawLine, "Conservar la línea original para copiar, incluido el espaciado y la zona horaria.");
         Check(entry.Level == expectedLevel && entry.Severity == severity, "Clasificar el nivel de la cabecera, no el contenido.");
         Check(entry.Timestamp == new DateTimeOffset(2026, 11, 16, 9, 30, 45, 123, TimeSpan.FromHours(-5)), "Conservar instante y offset.");
         Check(entry.Source == "Componente" && entry.Message == "Mensaje con ERROR y WARN [session=prueba check=]", "Conservar mensaje y correlación sin el relleno del componente.");
@@ -1410,6 +1412,7 @@ await Run("Diagnóstico: interpreta cabeceras y distingue nivel de palabras del 
     {
         DiagnosticLogEntry entry = AppLogReader.ParseLine(line);
         Check(entry.Severity == "Other" && entry.Timestamp is null && entry.Message == line, "Mostrar líneas no reconocidas sin inventar nivel ni perder contenido.");
+        Check(entry.RawLine == line, "Permitir copiar también líneas sin cabecera reconocida.");
     }
     return Task.CompletedTask;
 });
@@ -1422,7 +1425,7 @@ await Run("Diagnóstico: lee el formato real de Serilog y conserva los niveles",
     try
     {
         Log.ForContext("SourceContext", "ComponenteFicticio").Debug("Detalle de prueba");
-        Log.Information("Solicitud HTTP POST TrelloCard: estado 200; éxito True");
+        Log.Information("POST /cards -> 200 (12 ms)");
         Log.Warning("Advertencia de prueba");
         Log.Error("Error de prueba");
     }
@@ -1438,6 +1441,8 @@ await Run("Diagnóstico: lee el formato real de Serilog y conserva los niveles",
     Check(snapshot.Entries.Select(entry => entry.Level).SequenceEqual(new[] { "ERROR", "WARN", "INFO", "DEBUG" }), "Mostrar primero lo más reciente.");
     Check(snapshot.Entries.All(entry => entry.Timestamp is not null) && !snapshot.IsTruncated, "Leer las fechas reales sin truncar un archivo pequeño.");
     Check(snapshot.Entries.Last().Source == "ComponenteFicticio", "Conservar el origen del evento.");
+    Check(snapshot.Entries.Select(entry => entry.RawLine).SequenceEqual(File.ReadAllLines(Path.Combine(directory, files[0])).Reverse()),
+        "Copiar exactamente las líneas del formato compacto, sin reconstruir la fecha ni la correlación.");
 });
 
 await Run("Diagnóstico: comparte el archivo activo y espera líneas completas", async () =>
@@ -1549,16 +1554,15 @@ await Run("Logs: errores sin secretos y vaciado de la cola al cerrar", () =>
     {
         Check(!text.Contains(secret, StringComparison.Ordinal), "Excluir mensajes, datos, URL e interiores de excepciones.");
     }
-    Match header = Regex.Match(lines[0], @"^(?<timestamp>\S+)\s+ERROR\s+(?<pid>\d+) --- \[TrelloNotifier\] Program\s+: ",
+    Match header = Regex.Match(lines[0], @"^(?<timestamp>\d{4}-\d{2}-\d{2} \S+ [+-]\d{2}:\d{2}) \[ERR\] \[s:[a-f0-9]{8} c:comproba\] Program: ",
         RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-    Check(header.Success && DateTimeOffset.TryParse(header.Groups["timestamp"].Value, out _), "Cabecera de texto con fecha, nivel y componente al estilo Spring Boot.");
-    Check(header.Groups["pid"].Value == Environment.ProcessId.ToString(), "Identificar el proceso real.");
+    Check(header.Success && DateTimeOffset.TryParse(header.Groups["timestamp"].Value, out _), "Cabecera compacta con fecha, nivel y componente.");
     Check(lines[0].Contains($"tipo={typeof(HttpRequestException).FullName}"), "Conservar el tipo técnico legible.");
-    Check(lines[0].Contains("check=comprobacion-ficticia]"), "Propagar correlación.");
-    Check(Regex.IsMatch(lines[0], @"\[session=[a-f0-9]{32} check=", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) &&
+    Check(lines[0].Contains(" c:comproba]"), "Propagar correlación abreviada.");
+    Check(Regex.IsMatch(lines[0], @"\[s:[a-f0-9]{8} c:", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) &&
         !AppLog.HasWriteFailure, "Identificar sesión sin fallos del logger.");
-    Check(lines[1].Contains(" INFO ") && lines[1].Contains("TrelloNotifier.Services.SettingsStore") &&
-        lines[1].Contains(" : Evento de prueba 0"), "Mostrar componente y mensaje de información sin JSON.");
+    Check(lines[1].Contains("[INF]") && !lines[1].Contains("TrelloNotifier.Services.SettingsStore") &&
+        lines[1].Contains("SettingsStore: Evento de prueba 0"), "Mostrar nombre corto y mensaje sin JSON.");
     return Task.CompletedTask;
 });
 
@@ -1577,8 +1581,8 @@ await Run("Logs: modo diagnóstico y timeout como advertencia", () =>
     }
     string[] lines = Directory.GetFiles(fixture.DirectoryPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
     Check(lines.Length == 2, "Debug habilitado explícitamente.");
-    Check(lines[0].Contains(" DEBUG "), "Conservar detalle diagnóstico.");
-    Check(lines[1].Contains(" WARN "), "Timeout recuperable como advertencia.");
+    Check(lines[0].Contains("[DBG]"), "Conservar detalle diagnóstico.");
+    Check(lines[1].Contains("[WRN]"), "Timeout recuperable como advertencia.");
     Check(!lines[1].Contains("URL_PRIVADA_FICTICIA"), "No filtrar datos en timeout.");
     return Task.CompletedTask;
 });
@@ -1617,7 +1621,7 @@ await Run("Logs: monitor correlaciona fallo y recuperación sin datos de tarjeta
     using var fixture = new Fixture();
     string logsPath = Path.Combine(fixture.DirectoryPath, "Logs");
     using var monitor = fixture.CreateMonitor();
-    AppLog.Initialize(logsPath);
+    AppLog.Initialize(logsPath, debug: true);
     try
     {
         fixture.Api.Fail = true;
@@ -1647,8 +1651,8 @@ await Run("Logs: monitor correlaciona fallo y recuperación sin datos de tarjeta
     foreach (string line in lines)
     {
         Check(!line.Contains("TARJETA_SECRETA_FICTICIA") && !line.Contains("Fallo de conexión simulado"), "Excluir contenido privado del flujo real.");
-        Match correlation = Regex.Match(line, @" check=(?<id>[a-f0-9]{32})\]$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        if (line.Contains(" ERROR "))
+        Match correlation = Regex.Match(line, @" c:(?<id>[a-f0-9]{8})\]", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (line.Contains("[ERR]"))
         {
             errorCount++;
             failedCheckId = correlation.Groups["id"].Value;
@@ -1662,6 +1666,123 @@ await Run("Logs: monitor correlaciona fallo y recuperación sin datos de tarjeta
     }
     Check(errorCount == 1 && checks.Count == 2, "Un registro por fallo, dos comprobaciones y ninguna falsa alarma por cancelación.");
     Check(checks[failedCheckId!] == "Failed" && checks.Values.Contains("Succeeded"), "Correlación y recuperación observables.");
+});
+
+await Run("Logs: contexto estructurado conserva valores completos y aísla comprobaciones paralelas", async () =>
+{
+    var sink = new RecordingLogSink();
+    using var logger = new LoggerConfiguration().Enrich.FromLogContext().Enrich.With(new CompactLogEnricher())
+        .WriteTo.Sink(sink).CreateLogger();
+    const string session = "45120f6a0123456789abcdef0123456789";
+    using (LogContext.PushProperty("SessionId", session))
+    {
+        logger.ForContext<DueCardMonitor>().Information("Monitor iniciado");
+        await Task.WhenAll(new[] { "9b996914aaaaaaaaaaaaaaaaaaaaaaaa", "abcdef01bbbbbbbbbbbbbbbbbbbbbbbb" }.Select(id => Task.Run(async () =>
+        {
+            using (LogContext.PushProperty("CheckId", id))
+            {
+                await Task.Yield();
+                logger.ForContext<SettingsStore>().Information("Consulta terminada");
+            }
+        })));
+        logger.Information("Sin comprobación");
+    }
+    var events = sink.Events.ToArray();
+    Check(events.All(item => ((Serilog.Events.ScalarValue)item.Properties["SessionId"]).Value as string == session), "Conservar el SessionId completo a través de await y Task.Run.");
+    Check(((Serilog.Events.ScalarValue)events[0].Properties["SourceContext"]).Value as string == "TrelloNotifier.Services.DueCardMonitor" &&
+        ((Serilog.Events.ScalarValue)events[0].Properties["ShortSourceContext"]).Value as string == "DueCardMonitor", "Acortar solo la representación, sin alterar SourceContext.");
+    Check(!events[0].Properties.ContainsKey("CheckId") && !events[3].Properties.ContainsKey("CheckId") &&
+        ((Serilog.Events.ScalarValue)events[0].Properties["Correlation"]).Value as string == "s:45120f6a", "Omitir c: fuera del ciclo y restaurar los scopes.");
+    Check(events.Skip(1).Take(2).Select(item => ((Serilog.Events.ScalarValue)item.Properties["CheckId"]).Value).Distinct().Count() == 2,
+        "No mezclar identificadores entre tareas paralelas.");
+});
+
+await Run("Logs: monitor cuenta avisos agrupados, cooldown, deduplicación, desactivación y rechazo", async () =>
+{
+    using var fixture = new Fixture();
+    using var monitor = fixture.CreateMonitor();
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().Enrich.FromLogContext().WriteTo.Sink(sink).CreateLogger();
+    try
+    {
+        TrelloCard card = Card("privada-ficticia", DateTimeOffset.UtcNow.AddMinutes(10));
+        fixture.Api.Cards = new[] { card, card, Card("otra-ficticia", card.Due!.Value) };
+        await monitor.CheckNowAsync();
+        await monitor.CheckNowAsync();
+        AppSettings settings = fixture.Store.Load();
+        settings.RepeatReminderMinutes = 0;
+        fixture.Store.Save(settings);
+        await monitor.CheckNowAsync();
+        settings.NotificationsEnabled = false;
+        fixture.Store.Save(settings);
+        await monitor.CheckNowAsync();
+        settings.NotificationsEnabled = true;
+        fixture.Store.Save(settings);
+        fixture.Store.SaveNotifiedCards(new());
+        fixture.Notifications.Succeed = false;
+        await monitor.CheckNowAsync();
+    }
+    finally { Log.CloseAndFlush(); }
+    var summaries = sink.Events.Where(item => item.Properties.ContainsKey("EvaluatedCount")).ToArray();
+    int Count(int index, string key) => (int)((Serilog.Events.ScalarValue)summaries[index].Properties[key]).Value!;
+    Check(summaries.Length == 5 && Count(0, "NotificationCount") == 1 && Count(0, "NotifiedCardCount") == 2 && Count(0, "DeduplicatedCount") == 1,
+        "Una notificación agrupada para dos tarjetas distintas, sin duplicar la fila repetida.");
+    Check(Count(1, "NotificationCount") == 0 && Count(1, "CooldownCount") == 2, "No confundir candidatas con enviadas durante cooldown.");
+    Check(Count(2, "DeduplicatedCount") == 3 && Count(2, "CooldownCount") == 0, "Nunca repetir es deduplicación, no cooldown temporal.");
+    Check(Count(3, "DisabledCount") == 2 && Count(3, "NotificationCount") == 0, "Identificar preferencias desactivadas.");
+    Check(Count(4, "RejectedCount") == 2 && Count(4, "NotificationCount") == 0 && summaries[4].Level == Serilog.Events.LogEventLevel.Warning,
+        "Un rechazo no se cuenta como enviado ni consume historial.");
+    Check(fixture.Store.LoadNotifiedCards().Count == 0, "Conservar el reintento ante rechazo.");
+});
+
+await Run("Logs: ciclos sin cambios quedan en Debug y los cambios y recuperación son Information", async () =>
+{
+    using var fixture = new Fixture();
+    using var monitor = fixture.CreateMonitor();
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Sink(sink).CreateLogger();
+    try
+    {
+        await monitor.CheckNowAsync();
+        await monitor.CheckNowAsync();
+        fixture.Api.Cards = new[] { Card("futura", DateTimeOffset.UtcNow.AddDays(5)) };
+        await monitor.CheckNowAsync();
+        fixture.Api.Fail = true;
+        await monitor.CheckNowAsync();
+        fixture.Api.Fail = false;
+        await monitor.CheckNowAsync();
+    }
+    finally { Log.CloseAndFlush(); }
+    var levels = sink.Events.Where(item => item.Properties.ContainsKey("EvaluatedCount")).Select(item => item.Level).ToArray();
+    Check(levels.SequenceEqual(new[] { Serilog.Events.LogEventLevel.Information, Serilog.Events.LogEventLevel.Debug,
+        Serilog.Events.LogEventLevel.Information, Serilog.Events.LogEventLevel.Information }), "Informar primer estado, cambios y recuperación; reducir rutina.");
+});
+
+await Run("Logs: parada espera la comprobación manual antes de vaciar el archivo", async () =>
+{
+    using var fixture = new Fixture();
+    using var monitor = fixture.CreateMonitor();
+    using var release = new ManualResetEventSlim();
+    var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    fixture.Api.BeforeResponse = () => { entered.TrySetResult(true); if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException(); };
+    fixture.Api.Cards = new[] { Card("pendiente-ficticia", DateTimeOffset.UtcNow.AddMinutes(10)) };
+    string directory = Path.Combine(fixture.DirectoryPath, "Logs");
+    AppLog.Initialize(directory, debug: true);
+    try
+    {
+        Task check = monitor.CheckNowAsync();
+        await entered.Task;
+        Task stop = monitor.StopAsync();
+        Check(!stop.IsCompleted, "Esperar al productor antes de cerrar Serilog.");
+        release.Set();
+        await Task.WhenAll(check, stop);
+        await monitor.CheckNowAsync();
+        Check(fixture.Notifications.Batches.Count == 0, "No emitir nuevos avisos durante el cierre.");
+        Log.Information("Cierre ficticio completado");
+    }
+    finally { release.Set(); Log.CloseAndFlush(); }
+    string[] lines = Directory.GetFiles(directory, "*.log").SelectMany(File.ReadAllLines).ToArray();
+    Check(lines.Last().EndsWith("Cierre ficticio completado", StringComparison.Ordinal), "El marcador de cierre queda después de los eventos del monitor.");
 });
 
 await Run("Arquitectura: modelos independientes de servicios, UI e IO", () =>

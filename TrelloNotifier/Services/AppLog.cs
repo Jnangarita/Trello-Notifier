@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Serilog;
-using Serilog.Core;
 using Serilog.Debugging;
 using Serilog.Events;
 
@@ -16,31 +15,35 @@ internal static class AppLog
 
     public static bool HasWriteFailure => Volatile.Read(ref _hasWriteFailure) != 0;
     public static string DirectoryPath { get; private set; } = DefaultDirectoryPath;
+    public static string SessionId { get; private set; } = string.Empty;
 
     public static void Initialize(string? directoryPath = null, bool debug = false)
     {
         Interlocked.Exchange(ref _hasWriteFailure, 0);
+        SessionId = Guid.NewGuid().ToString("N");
         // SelfLog puede contener rutas y excepciones: nunca copiar su texto.
         SelfLog.Enable(_ => ReportWriteFailure());
         try
         {
             DirectoryPath = directoryPath ?? DefaultDirectoryPath;
             Directory.CreateDirectory(DirectoryPath);
+            // El valor global respalda callbacks nativos sin ExecutionContext de arranque.
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Is(debug ? LogEventLevel.Debug : LogEventLevel.Information)
                 .Enrich.FromLogContext()
-                .Enrich.With(new LogLevelEnricher())
-                .Enrich.WithProperty("SessionId", Guid.NewGuid().ToString("N"))
+                .Enrich.WithProperty("SessionId", SessionId)
                 .Enrich.WithProperty("ProcessId", Environment.ProcessId)
                 .Enrich.WithProperty("SourceContext", "TrelloNotifier")
+                .Enrich.With(new CompactLogEnricher())
                 .WriteTo.Async(sink => sink.File(
                     Path.Combine(DirectoryPath, FileNamePrefix + ".log"),
-                    outputTemplate: "{Timestamp:yyyy-MM-ddTHH:mm:ss.fffzzz} {LevelLabel,5:l} {ProcessId} --- [TrelloNotifier] {SourceContext,-48:l} : {Message:l} [session={SessionId} check={CheckId}]{NewLine}",
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{Correlation:l}] {ShortSourceContext:l}: {Message:lj}{NewLine}{Exception}",
                     formatProvider: System.Globalization.CultureInfo.InvariantCulture,
                     rollingInterval: RollingInterval.Day,
                     fileSizeLimitBytes: 5 * 1024 * 1024,
                     rollOnFileSizeLimit: true,
                     retainedFileCountLimit: 14,
+                    flushToDiskInterval: TimeSpan.FromSeconds(1),
                     shared: true), bufferSize: 1000, blockWhenFull: false)
                 .CreateLogger();
         }
@@ -77,22 +80,4 @@ internal static class AppLog
         }
     }
 
-    private sealed class LogLevelEnricher : ILogEventEnricher
-    {
-        public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
-        {
-            // u5 de Serilog genera INFOR/WARNI; Spring Boot utiliza INFO/WARN.
-            string label = logEvent.Level switch
-            {
-                LogEventLevel.Verbose => "TRACE",
-                LogEventLevel.Debug => "DEBUG",
-                LogEventLevel.Information => "INFO",
-                LogEventLevel.Warning => "WARN",
-                LogEventLevel.Error => "ERROR",
-                LogEventLevel.Fatal => "FATAL",
-                _ => logEvent.Level.ToString()
-            };
-            logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("LevelLabel", label));
-        }
-    }
 }
