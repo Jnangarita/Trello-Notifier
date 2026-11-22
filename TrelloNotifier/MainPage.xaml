@@ -57,6 +57,11 @@
                 </StackPanel>
             </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
+                <NavigationViewItem Content="Dashboard" Tag="Home" FontWeight="SemiBold">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE80F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Mis tarjetas" Tag="Dashboard" FontWeight="SemiBold">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8A9;" />

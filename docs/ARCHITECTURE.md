@@ -7,6 +7,7 @@ Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework
 
 ```text
 App → MainWindow / MainPage → DashboardPage / SettingsPage
+MainPage → HomeDashboardPage → WeatherClient → HTTP Open-Meteo (solo lectura)
 MainPage → CreateCardPage → SettingsStore / TrelloApiClient
 MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
 CreateCardPage / BulkCreateCardPage → GeminiCardClient → HTTP Gemini (solo propuestas)
@@ -44,6 +45,16 @@ al salir y no persiste tarjetas. Ambas vistas reutilizan filas, estilos y
 `TrelloCardViewModel`; las archivadas muestran su condición de completado sin
 urgencia temporal. El monitor actualiza controles mediante `DispatcherQueue`.
 La UI contiene coordinación en code-behind.
+
+`HomeDashboardPage` es el Dashboard de inicio, separado de las tablas existentes.
+Obtiene el clima solo desde `AppServices.Weather`. `WeatherClient` posee su propio
+`HttpClient`, valida configuración de entorno y respuesta, serializa cargas con
+`SemaphoreSlim` y conserva una entrada en memoria: una hora si tuvo éxito, cinco
+minutos si falló. La apertura normal respeta esa caché; el botón de refresco pasa
+`forceRefresh: true` para consultar y renovarla incluso tras un fallo. Devuelve
+`WeatherReport` o ausencia; la vista presenta carga,
+datos o «No disponible» y cancela/descarta resultados al navegar. No accede a
+SQLite, Trello, monitor o notificaciones. Ver configuración en README.
 
 `CreateCardPage` implementa el formulario manual, reutiliza estilos y el cliente HTTP
 compartido, y coordina la creación de tarjeta, checklists y elementos. Los borradores

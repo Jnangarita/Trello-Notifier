@@ -32,7 +32,7 @@ public sealed partial class MainPage : Page
     private async void Navigation_Loaded(object sender, RoutedEventArgs e)
     {
         Navigation.SelectedItem = Navigation.MenuItems[0];
-        NavigateToCards(TrelloCardScope.Pending);
+        NavigateToDashboard();
         try
         {
             var settings = await Task.Run(AppServices.Settings.Load);
@@ -54,8 +54,19 @@ public sealed partial class MainPage : Page
         }
 
         string? tag = (args.InvokedItemContainer as NavigationViewItem)?.Tag as string;
+        if (tag == "Home")
+        {
+            NavigateToDashboard();
+            return;
+        }
         NavigateToCards(tag == "History"
             ? TrelloCardScope.History : TrelloCardScope.Pending);
+    }
+
+    private void NavigateToDashboard()
+    {
+        if (ContentFrame.Content is HomeDashboardPage || ContentFrame.Navigate(typeof(HomeDashboardPage)))
+            Navigation.Header = "Dashboard";
     }
 
     internal void NavigateToManualCreation()

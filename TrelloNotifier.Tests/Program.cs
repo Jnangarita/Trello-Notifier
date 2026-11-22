@@ -10,6 +10,240 @@ using TrelloNotifier.Tests;
 DateTimeOffset now = new(2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
 int passed = 0;
 
+await Run("Clima: consulta independiente sin claves, caché de una hora y renovación", async () =>
+{
+    DateTimeOffset clock = now;
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (request, _) =>
+        {
+            Check(request.Method == HttpMethod.Get && request.RequestUri!.Host == "api.open-meteo.com" &&
+                request.RequestUri.AbsolutePath == "/v1/forecast", "Consultar únicamente Open-Meteo por HTTPS.");
+            string query = request.RequestUri!.Query;
+            Check(query.Contains("latitude=10.9685") && query.Contains("longitude=-74.7813") &&
+                query.Contains("timeformat=unixtime") && query.Contains("temperature_unit=celsius") &&
+                query.Contains("wind_speed_unit=kmh") && query.Contains("apparent_temperature,weather_code,is_day") &&
+                !query.Contains("key") && !request.Headers.Any(),
+                "Usar coordenadas invariantes, unidades explícitas y ninguna credencial de Trello.");
+            return Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":17.5,\"apparent_temperature\":16.2,\"weather_code\":2,\"is_day\":1,\"wind_speed_10m\":8.2,\"time\":1790000000}}"));
+        }
+    };
+    using var client = new WeatherClient(handler, WeatherLocation.Default, () => clock);
+    WeatherReport? report = await client.GetCurrentAsync(CancellationToken.None);
+    Check(report is { TemperatureCelsius: 17.5, WindSpeedKmh: 8.2 } &&
+        report.ObservedAt == DateTimeOffset.FromUnixTimeSeconds(1790000000), "Interpretar valores y hora UTC del proveedor.");
+    Check(report is { ApparentTemperatureCelsius: 16.2, IsDay: true, Condition: WeatherCondition.PartlyCloudy } &&
+        report.ConditionText == "Parcialmente nublado", "La tarjeta muestra sensación y condiciones reales de la API.");
+    clock = now.AddMinutes(59);
+    Check(await client.GetCurrentAsync(CancellationToken.None) == report && handler.Calls == 1, "Abrir o volver al Dashboard reutiliza caché.");
+    clock = now.AddHours(1);
+    await client.GetCurrentAsync(CancellationToken.None);
+    Check(handler.Calls == 2, "Renovar al alcanzar exactamente una hora.");
+});
+
+await Run("Clima: refresco manual consulta con caché vigente y renueva el dato y su vigencia", async () =>
+{
+    DateTimeOffset clock = now;
+    int temperature = 22;
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(JsonSerializer.Serialize(
+            new { current = new { temperature_2m = temperature, wind_speed_10m = 1, time = 1790000000 } })))
+    };
+    using var client = new WeatherClient(handler, WeatherLocation.Default, () => clock);
+    WeatherReport? original = await client.GetCurrentAsync(CancellationToken.None);
+    temperature = 30;
+    clock = now.AddMinutes(10);
+    Check(await client.GetCurrentAsync(CancellationToken.None) == original && handler.Calls == 1,
+        "La apertura normal mantiene el dato en caché aunque el servidor tenga otro.");
+    WeatherReport? refreshed = await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true);
+    Check(refreshed?.TemperatureCelsius == 30 && handler.Calls == 2,
+        "La acción manual consulta y publica el dato nuevo sin esperar una hora.");
+    temperature = 31;
+    clock = now.AddMinutes(65);
+    Check(await client.GetCurrentAsync(CancellationToken.None) == refreshed && handler.Calls == 2,
+        "Volver al Dashboard usa la caché renovada durante una hora desde el refresco manual.");
+    clock = now.AddMinutes(70);
+    Check((await client.GetCurrentAsync(CancellationToken.None))?.TemperatureCelsius == 31 && handler.Calls == 3,
+        "La caché renovada también expira al alcanzar exactamente una hora.");
+});
+
+await Run("Clima: refresco manual permite recuperación inmediata tras fallo y conserva el fallback", async () =>
+{
+    bool fail = true;
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(
+            "{\"current\":{\"temperature_2m\":30,\"wind_speed_10m\":1,\"time\":1790000000}}",
+            fail ? System.Net.HttpStatusCode.ServiceUnavailable : System.Net.HttpStatusCode.OK))
+    };
+    using var client = new WeatherClient(handler, WeatherLocation.Default, () => now);
+    Check(await client.GetCurrentAsync(CancellationToken.None) is null, "Representar el fallo inicial.");
+    fail = false;
+    Check(await client.GetCurrentAsync(CancellationToken.None) is null && handler.Calls == 1,
+        "Las aperturas normales respetan la espera tras fallo.");
+    Check(await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true) is not null && handler.Calls == 2,
+        "Pulsar refrescar reintenta sin esperar cinco minutos.");
+    fail = true;
+    Check(await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true) is null && handler.Calls == 3,
+        "Un refresco manual fallido devuelve No disponible sin lanzar excepciones a UI.");
+    fail = false;
+    Check(await client.GetCurrentAsync(CancellationToken.None) is null && handler.Calls == 3,
+        "El fallo manual establece la misma espera para aperturas normales.");
+    Check(await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true) is not null && handler.Calls == 4,
+        "Un nuevo refresco manual recupera el clima inmediatamente.");
+    Check(await client.GetCurrentAsync(CancellationToken.None) is not null && handler.Calls == 4,
+        "Compartir el resultado recuperado con las aperturas siguientes.");
+});
+
+await Run("Clima: cancelar el refresco manual conserva la caché válida y descarta respuestas tardías", async () =>
+{
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":22,\"wind_speed_10m\":1,\"time\":1790000000}}"))
+    };
+    using var client = new WeatherClient(handler, WeatherLocation.Default, () => now);
+    WeatherReport? original = await client.GetCurrentAsync(CancellationToken.None);
+    var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    handler.Respond = async (_, _) =>
+    {
+        started.SetResult(true);
+        await release.Task;
+        return GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":30,\"wind_speed_10m\":1,\"time\":1790000000}}");
+    };
+    using var cancellation = new CancellationTokenSource();
+    Task<WeatherReport?> refreshing = client.GetCurrentAsync(cancellation.Token, forceRefresh: true);
+    await started.Task;
+    cancellation.Cancel();
+    release.SetResult(true);
+    bool canceled = false;
+    try { await refreshing; }
+    catch (OperationCanceledException) { canceled = true; }
+    Check(canceled && handler.Calls == 2, "Cancelar la consulta forzada al navegar.");
+    Check(await client.GetCurrentAsync(CancellationToken.None) == original && handler.Calls == 2,
+        "No reemplazar la caché válida con un resultado cancelado ni forzar otra solicitud al volver.");
+});
+
+await Run("Clima: fallos HTTP, red, timeout y JSON dan fallback temporal y permiten recuperación", async () =>
+{
+    Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] failures =
+    {
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("private-weather-body", System.Net.HttpStatusCode.ServiceUnavailable)),
+        (_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("private-weather-error")),
+        (_, _) => Task.FromException<HttpResponseMessage>(new TaskCanceledException("private-weather-timeout")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("no-json")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("{}")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":null,\"wind_speed_10m\":0,\"time\":0}}")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":10,\"wind_speed_10m\":-1,\"time\":0}}")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":10,\"wind_speed_10m\":1,\"time\":253402300800}}")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":10,\"wind_speed_10m\":1,\"is_day\":2,\"time\":1790000000}}")),
+        (_, _) => Task.FromResult(GeminiHttpDouble.Json(new string('x', 65537)))
+    };
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().Enrich.FromLogContext().WriteTo.Sink(sink).CreateLogger();
+    try
+    {
+        foreach (var failure in failures)
+        {
+            DateTimeOffset clock = now;
+            using var handler = new GeminiHttpDouble { Respond = failure };
+            using var client = new WeatherClient(handler, WeatherLocation.Default, () => clock);
+            Check(await client.GetCurrentAsync(CancellationToken.None) is null, "Un fallo devuelve No disponible sin excepción en UI.");
+            clock = now.AddMinutes(4);
+            Check(await client.GetCurrentAsync(CancellationToken.None) is null && handler.Calls == 1,
+                "Limitar también los intentos fallidos al abrir repetidamente.");
+            handler.Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":18,\"wind_speed_10m\":0,\"time\":1790000000}}"));
+            clock = now.AddMinutes(5);
+            Check(await client.GetCurrentAsync(CancellationToken.None) is not null && handler.Calls == 2,
+                "Reintentar tras cinco minutos y recuperar el clima.");
+        }
+    }
+    finally { Log.CloseAndFlush(); }
+    var warnings = sink.Events.Where(item => item.Level == Serilog.Events.LogEventLevel.Warning).ToArray();
+    Check(warnings.Length == failures.Length && warnings.All(item => item.Properties.ContainsKey("WeatherRequestId")),
+        "Registrar cada fallo una vez y con LogContext.");
+    Check(sink.Events.Any(item => item.Level == Serilog.Events.LogEventLevel.Information) &&
+        sink.Events.All(item => !item.RenderMessage().Contains("private-weather") &&
+            !(item.Exception?.ToString().Contains("private-weather") ?? false)), "Registrar resultados INFO y fallos saneados.");
+});
+
+await Run("Clima: solicitudes simultáneas comparten caché y cancelar no publica resultados tardíos", async () =>
+{
+    var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = async (_, _) =>
+        {
+            started.TrySetResult(true);
+            await release.Task;
+            return GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":18,\"wind_speed_10m\":0,\"time\":1790000000}}");
+        }
+    };
+    using var client = new WeatherClient(handler, WeatherLocation.Default, () => now);
+    using var cancellation = new CancellationTokenSource();
+    Task<WeatherReport?> canceled = client.GetCurrentAsync(cancellation.Token);
+    await started.Task;
+    Task<WeatherReport?> next = client.GetCurrentAsync(CancellationToken.None);
+    Task<WeatherReport?> concurrent = client.GetCurrentAsync(CancellationToken.None);
+    cancellation.Cancel();
+    release.SetResult(true);
+    bool observedCancellation = false;
+    try { await canceled; }
+    catch (OperationCanceledException) { observedCancellation = true; }
+    Check(observedCancellation, "Respetar navegación incluso si el transporte responde tarde.");
+    WeatherReport?[] reports = await Task.WhenAll(next, concurrent);
+    Check(reports.All(report => report is not null) && handler.Calls == 2,
+        "No guardar la respuesta cancelada; las dos cargas siguientes hacen una sola petición.");
+    using var alreadyCanceled = new CancellationTokenSource();
+    alreadyCanceled.Cancel();
+    try { await client.GetCurrentAsync(alreadyCanceled.Token); Check(false, "Cancelar también al tener caché."); }
+    catch (OperationCanceledException) { }
+});
+
+await Run("Clima: coordenadas configurables válidas y valores ausentes o inválidos seguros", () =>
+{
+    Check(WeatherClient.ResolveLocation(null, null, null) == WeatherLocation.Default, "Usar Barranquilla sin configuración.");
+    Check(WeatherClient.ResolveLocation("-34.6", "-58.38", " Buenos Aires ") == new WeatherLocation(-34.6, -58.38, "Buenos Aires"),
+        "Aceptar coordenadas negativas y nombre opcional.");
+    Check(WeatherClient.ResolveLocation("0", "0", null).Name == "Ubicación configurada", "No atribuir a Barranquilla coordenadas personalizadas.");
+    foreach (var pair in new[] { ("91", "0"), ("0", "181"), ("NaN", "0"), ("Infinity", "0"), ("4,7", "0"), ("4.7", "") })
+        Check(WeatherClient.ResolveLocation(pair.Item1, pair.Item2, null) == WeatherLocation.Default, "Validar rangos, finitud y ambas coordenadas.");
+    Check(WeatherClient.ResolveLocation("0", "0", "ciudad\ninválida") == WeatherLocation.Default, "Validar también la etiqueta visible.");
+    return Task.CompletedTask;
+});
+
+await Run("Clima: condiciones WMO, noche y campos opcionales tienen presentación coherente", async () =>
+{
+    foreach (var sample in new[]
+    {
+        (Code: 0, Condition: WeatherCondition.Clear, Text: "Noche despejada"),
+        (Code: 2, Condition: WeatherCondition.PartlyCloudy, Text: "Parcialmente nublado"),
+        (Code: 3, Condition: WeatherCondition.Cloudy, Text: "Nublado"),
+        (Code: 45, Condition: WeatherCondition.Fog, Text: "Niebla"),
+        (Code: 63, Condition: WeatherCondition.Rain, Text: "Lluvia"),
+        (Code: 85, Condition: WeatherCondition.Snow, Text: "Nieve"),
+        (Code: 95, Condition: WeatherCondition.Thunderstorm, Text: "Tormenta"),
+        (Code: 1000, Condition: WeatherCondition.Unknown, Text: "Condiciones no disponibles")
+    })
+    {
+        using var handler = new GeminiHttpDouble
+        {
+            Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json(
+                JsonSerializer.Serialize(new { current = new { temperature_2m = 22, wind_speed_10m = 1, time = 1790000000, weather_code = sample.Code, is_day = 0 } })))
+        };
+        using var client = new WeatherClient(handler, WeatherLocation.Default, () => now);
+        WeatherReport? report = await client.GetCurrentAsync(CancellationToken.None);
+        Check(report is { IsDay: false, ApparentTemperatureCelsius: null } &&
+            report.Condition == sample.Condition && report.ConditionText == sample.Text,
+            "Interpretar la noche y las familias meteorológicas; no inventar sensación ni condiciones desconocidas.");
+    }
+    var missing = new WeatherReport(22, 1, now);
+    Check(missing.Condition == WeatherCondition.Unknown && missing.ApparentTemperatureCelsius is null,
+        "Los campos ausentes no se presentan como un cielo despejado ni como cero grados.");
+});
+
 await Run("Gemini solicita JSON, aísla credenciales y devuelve propuestas sin destino", async () =>
 {
     using var handler = new GeminiHttpDouble();

@@ -42,6 +42,25 @@ explícitas; no abrir datos del usuario ni notificaciones/red reales.
 Los nombres describen comportamiento esperado en español. Nueva lógica de
 negocio → tests. Bug fix → regression test cuando sea razonable.
 
+## Clima del Dashboard
+
+El runner enlaza `WeatherClient` real y reutiliza el handler HTTP programable de
+las pruebas con respuestas meteorológicas ficticias. Cubre endpoint sin claves,
+unidades y timestamp UTC, sensación térmica, condiciones WMO y noche, campos
+opcionales o desconocidos, caché y expiración exacta, refresco manual que fuerza
+HTTP y renueva la caché (también tras fallo), llamadas concurrentes,
+cancelación tardía, coordenadas inválidas, fallos HTTP/red/timeout/JSON, límite de
+respuesta, recuperación tras cinco minutos y logging correlacionado y saneado.
+No consulta Open-Meteo real ni usa preferencias del usuario.
+
+Revisión WinUI con dobles: abrir Dashboard sin configurar Trello, comprobar carga,
+temperatura/viento/hora, aperturas con caché, refresco manual con nueva solicitud
+y «No disponible». Pulsar refrescar debe actualizar también tras un fallo sin esperar
+cinco minutos; durante la carga, el botón queda deshabilitado. Navegar fuera mientras
+carga y regresar; verificar que no aparecen resultados tardíos. Comprobar que el
+clima no aparece en Mis tarjetas, Historial ni Configuración. Revisar textos largos,
+ventanas amplia/compacta, teclado, temas claro/oscuro y alto contraste.
+
 ## Gemini y preparación de lotes
 
 El runner enlaza `GeminiCardClient` con `GeminiHttpDouble`: comprueba el endpoint y

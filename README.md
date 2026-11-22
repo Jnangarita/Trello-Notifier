@@ -98,6 +98,48 @@ La aplicación avisa de tarjetas próximas a vencer y, opcionalmente, de vencida
 
 Referencia: [documentación oficial de autorización de Trello](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
 
+## Dashboard y clima
+
+La aplicación inicia en **Dashboard**, una página independiente de **Mis tarjetas**
+e **Historial**. Su tarjeta azul muestra temperatura (°C), sensación térmica e
+icono y descripción de las condiciones reales, también de noche. El tooltip de
+la tarjeta conserva viento (km/h), fuente y fecha de los datos de
+[Open-Meteo](https://open-meteo.com/), sin API key. El clima se consulta solo al
+abrir esa página o pulsar **Actualizar clima** y no genera acciones en Trello ni
+notificaciones de escritorio.
+
+La ubicación predeterminada es **Barranquilla, Colombia** (latitud `10.9685`, longitud `-74.7813`).
+Para cambiarla, define estas variables de entorno antes de iniciar la aplicación:
+
+| Variable | Descripción |
+| --- | --- |
+| `TRELLO_NOTIFIER_WEATHER_LATITUDE` | Latitud entre -90 y 90, con punto decimal. |
+| `TRELLO_NOTIFIER_WEATHER_LONGITUDE` | Longitud entre -180 y 180, con punto decimal. |
+| `TRELLO_NOTIFIER_WEATHER_CITY` | Etiqueta opcional de la ubicación; no hace geocodificación. |
+
+Ejemplo en PowerShell, iniciando después el ejecutable desde esa misma consola:
+
+```powershell
+$env:TRELLO_NOTIFIER_WEATHER_LATITUDE = "40.4168"
+$env:TRELLO_NOTIFIER_WEATHER_LONGITUDE = "-3.7038"
+$env:TRELLO_NOTIFIER_WEATHER_CITY = "Madrid"
+```
+
+Se requieren ambas coordenadas; si faltan o son inválidas se usa Barranquilla. Cambiar
+solo la etiqueta no cambia la ubicación. Reinicia la aplicación para aplicar cambios.
+No se modifica SQLite. Las coordenadas se envían únicamente a Open-Meteo; la etiqueta
+permanece local y no se registran ubicación, URL completa ni respuestas en los logs.
+
+El cliente compartido conserva los datos **1 hora en memoria** al abrir el Dashboard
+o volver a él. Tras un fallo muestra **No disponible** y las aperturas normales
+respetan una espera de **5 minutos**, para evitar llamadas repetidas. Pulsar
+**Actualizar clima** fuerza una nueva consulta, incluso si hay caché vigente o
+una espera tras fallo; su resultado actualiza la caché compartida. El botón queda
+deshabilitado durante la carga para impedir solicitudes duplicadas. Cada solicitud
+tiene un timeout de **10 segundos** y se cancela al salir; la interfaz sigue disponible.
+La hora mostrada corresponde a la zona local del equipo. Los datos son condiciones
+calculadas por modelos meteorológicos de Open-Meteo.
+
 ## Logs y diagnóstico
 
 Los logs se consultan directamente en los archivos `.log` con un editor de texto.
