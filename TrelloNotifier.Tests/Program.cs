@@ -1391,33 +1391,7 @@ await Run("Completadas, archivadas o ausentes dejan de avisar y un nuevo vencimi
     Check(fixture.Store.LoadNotifiedCards().Count == 1, "Retirar claves completadas, archivadas, ausentes y del vencimiento anterior.");
 });
 
-await Run("Diagnóstico: interpreta cabeceras y distingue nivel de palabras del mensaje", () =>
-{
-    string timestamp = "2026-11-16T09:30:45.123-05:00";
-    foreach (var (level, expectedLevel, severity) in new[]
-    {
-        ("INFO", "INFO", "Info"), ("WARN", "WARN", "Warning"), ("ERROR", "ERROR", "Error"),
-        ("FATAL", "FATAL", "Error"), ("DEBUG", "DEBUG", "Other"), ("TRACE", "TRACE", "Other"),
-        ("INFOR", "INFO", "Info"), ("WARNI", "WARN", "Warning")
-    })
-    {
-        string rawLine = $"{timestamp} {level,5} 123 --- [TrelloNotifier] Componente   : Mensaje con ERROR y WARN [session=prueba check=]";
-        DiagnosticLogEntry entry = AppLogReader.ParseLine(rawLine);
-        Check(entry.RawLine == rawLine, "Conservar la línea original para copiar, incluido el espaciado y la zona horaria.");
-        Check(entry.Level == expectedLevel && entry.Severity == severity, "Clasificar el nivel de la cabecera, no el contenido.");
-        Check(entry.Timestamp == new DateTimeOffset(2026, 11, 16, 9, 30, 45, 123, TimeSpan.FromHours(-5)), "Conservar instante y offset.");
-        Check(entry.Source == "Componente" && entry.Message == "Mensaje con ERROR y WARN [session=prueba check=]", "Conservar mensaje y correlación sin el relleno del componente.");
-    }
-    foreach (string line in new[] { "Texto suelto con ERROR", "2026-99-16T09:30:45.123-05:00 ERROR 123 --- [TrelloNotifier] Componente : Fecha inválida", "Línea adicional" })
-    {
-        DiagnosticLogEntry entry = AppLogReader.ParseLine(line);
-        Check(entry.Severity == "Other" && entry.Timestamp is null && entry.Message == line, "Mostrar líneas no reconocidas sin inventar nivel ni perder contenido.");
-        Check(entry.RawLine == line, "Permitir copiar también líneas sin cabecera reconocida.");
-    }
-    return Task.CompletedTask;
-});
-
-await Run("Diagnóstico: lee el formato real de Serilog y conserva los niveles", async () =>
+await Run("Logs: escribe el formato compacto y los niveles en el archivo", () =>
 {
     using var fixture = new Fixture(initialize: false);
     string directory = Path.Combine(fixture.DirectoryPath, "Logs");
@@ -1428,97 +1402,54 @@ await Run("Diagnóstico: lee el formato real de Serilog y conserva los niveles",
         Log.Information("POST /cards -> 200 (12 ms)");
         Log.Warning("Advertencia de prueba");
         Log.Error("Error de prueba");
+        Log.Fatal("Error fatal de prueba");
     }
     finally
     {
         Log.CloseAndFlush();
     }
-    Check(AppLog.DirectoryPath == directory, "El visor comparte el destino configurado por el logger.");
-    var reader = new AppLogReader(AppLog.DirectoryPath);
-    IReadOnlyList<string> files = await reader.GetFilesAsync(CancellationToken.None);
-    Check(files.Count == 1, "Reconocer el nombre de archivo que genera Serilog.");
-    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(files[0], CancellationToken.None);
-    Check(snapshot.Entries.Select(entry => entry.Level).SequenceEqual(new[] { "ERROR", "WARN", "INFO", "DEBUG" }), "Mostrar primero lo más reciente.");
-    Check(snapshot.Entries.All(entry => entry.Timestamp is not null) && !snapshot.IsTruncated, "Leer las fechas reales sin truncar un archivo pequeño.");
-    Check(snapshot.Entries.Last().Source == "ComponenteFicticio", "Conservar el origen del evento.");
-    Check(snapshot.Entries.Select(entry => entry.RawLine).SequenceEqual(File.ReadAllLines(Path.Combine(directory, files[0])).Reverse()),
-        "Copiar exactamente las líneas del formato compacto, sin reconstruir la fecha ni la correlación.");
+    string[] files = Directory.GetFiles(directory, "trello-notifier*.log");
+    Check(files.Length == 1, "Escribir el archivo de log en el destino configurado.");
+    string[] lines = File.ReadAllLines(files[0]);
+    Check(lines.Length == 5 && new[] { "DEBUG", "INFO", "WARN", "ERROR", "FATAL" }.Select((level, index) => lines[index].Contains($"[{level}]")).All(found => found),
+        "Escribir los nombres completos de los niveles y conservar el orden cronológico en el archivo.");
+    Check(lines[0].Contains("ComponenteFicticio: Detalle de prueba"), "Conservar el componente del evento.");
+    return Task.CompletedTask;
 });
 
-await Run("Diagnóstico: comparte el archivo activo y espera líneas completas", async () =>
+await Run("Logs: reutiliza el archivo entre arranques y rota por tamaño conservando tres", () =>
 {
     using var fixture = new Fixture(initialize: false);
-    const string fileName = "trello-notifier-20261116.log";
-    string path = Path.Combine(fixture.DirectoryPath, fileName);
-    using var writer = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), new System.Text.UTF8Encoding(true));
-    await writer.WriteAsync("2026-11-16T09:00:00.000+00:00 INFO 123 --- [TrelloNotifier] Prueba : Completo\r\n\r\nParcial");
-    await writer.FlushAsync();
-    var reader = new AppLogReader(fixture.DirectoryPath);
-    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
-    Check(snapshot.Entries.Count == 1 && snapshot.Entries[0].Level == "INFO", "Admitir BOM y archivo abierto sin mostrar una escritura a medias.");
-    await writer.WriteAsync(" terminado\r\n");
-    await writer.FlushAsync();
-    snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
-    Check(snapshot.Entries.Count == 2 && snapshot.Entries[0].Message == "Parcial terminado", "Actualizar sin duplicados y conservar líneas fuera del formato.");
-    await writer.DisposeAsync();
-    await File.WriteAllTextAsync(path, string.Empty);
-    Check((await reader.ReadRecentAsync(fileName, CancellationToken.None)).Entries.Count == 0, "Admitir un archivo vacío o recién truncado.");
-});
+    string currentPath = Path.Combine(fixture.DirectoryPath, AppLog.FileName);
+    WriteSession("Primer arranque ficticio");
+    File.SetLastWriteTimeUtc(currentPath, DateTime.UtcNow.AddDays(-2));
+    WriteSession("Segundo arranque ficticio");
+    Check(Directory.GetFiles(fixture.DirectoryPath, "*.log").Length == 1 &&
+        File.ReadAllText(currentPath).Contains("Primer arranque ficticio") && File.ReadAllText(currentPath).Contains("Segundo arranque ficticio"),
+        "Reutilizar el archivo existente sin rotar al reiniciar ni por su fecha.");
 
-await Run("Diagnóstico: limita líneas y bytes manteniendo los últimos registros UTF-8", async () =>
-{
-    using var fixture = new Fixture(initialize: false);
-    const string fileName = "trello-notifier-20261116.log";
-    string path = Path.Combine(fixture.DirectoryPath, fileName);
-    var reader = new AppLogReader(fixture.DirectoryPath);
-    await File.WriteAllLinesAsync(path, Enumerable.Range(0, AppLogReader.MaxEntries + 3).Select(index => $"Registro {index}"));
-    DiagnosticLogSnapshot snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
-    Check(snapshot.IsTruncated && snapshot.Entries.Count == AppLogReader.MaxEntries, "Limitar la cantidad visible.");
-    Check(snapshot.Entries[0].Message == $"Registro {AppLogReader.MaxEntries + 2}" && snapshot.Entries.Last().Message == "Registro 3", "Descartar solo los registros más antiguos.");
-    await File.WriteAllTextAsync(path, new string('ñ', AppLogReader.MaxReadBytes) + "\nÚltimo registro completo\n");
-    snapshot = await reader.ReadRecentAsync(fileName, CancellationToken.None);
-    Check(snapshot.IsTruncated && snapshot.Entries.Count == 1 && snapshot.Entries[0].Message == "Último registro completo", "Descartar el fragmento UTF-8 inicial y conservar líneas completas al limitar bytes.");
-});
-
-await Run("Diagnóstico: restringe archivos y permite cancelar o recuperar tras rotación", async () =>
-{
-    using var fixture = new Fixture(initialize: false);
-    var reader = new AppLogReader(fixture.DirectoryPath);
-    Check((await new AppLogReader(Path.Combine(fixture.DirectoryPath, "Ausente")).GetFilesAsync(CancellationToken.None)).Count == 0, "Una carpeta todavía no creada muestra estado vacío.");
-    const string oldName = "trello-notifier-20261115.log";
-    const string newName = "trello-notifier-20261116_001.log";
-    foreach (string name in new[] { oldName, newName, "ajustes.json", "otro.log", "trello-notifier-incorrecto.log" })
-        await File.WriteAllTextAsync(Path.Combine(fixture.DirectoryPath, name), "Dato ficticio\n");
-    File.SetLastWriteTimeUtc(Path.Combine(fixture.DirectoryPath, oldName), new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc));
-    File.SetLastWriteTimeUtc(Path.Combine(fixture.DirectoryPath, newName), new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc));
-    Check((await reader.GetFilesAsync(CancellationToken.None)).SequenceEqual(new[] { newName, oldName }), "Listar solo logs propios, incluidos archivos rotados, del más reciente al más antiguo.");
-    foreach (string invalid in new[] { "../" + newName, "..\\" + newName, Path.Combine(fixture.DirectoryPath, newName), "otro.log", newName + "\n" })
+    for (int sequence = 1; sequence <= 4; sequence++)
     {
-        bool rejected = false;
-        try { await reader.ReadRecentAsync(invalid, CancellationToken.None); }
-        catch (ArgumentException) { rejected = true; }
-        Check(rejected, "Impedir lecturas fuera de la carpeta o con nombres ajenos al logger.");
+        // Archivo ficticio lleno: comprobar el límite real de producción sin generar miles de eventos.
+        using (var stream = new FileStream(currentPath, FileMode.Open, FileAccess.Write)) stream.SetLength(5 * 1024 * 1024);
+        WriteSession($"Rotación ficticia {sequence}");
+        currentPath = Path.Combine(fixture.DirectoryPath, $"trello-notifier_{sequence:000}.log");
+        Check(File.Exists(currentPath) && File.ReadAllText(currentPath).Contains($"Rotación ficticia {sequence}"),
+            "Escribir el siguiente evento en un archivo nuevo cuando el anterior llegó a 5 MiB.");
+        string[] expected = Enumerable.Range(Math.Max(0, sequence - 2), Math.Min(sequence + 1, 3))
+            .Select(index => index == 0 ? AppLog.FileName : $"trello-notifier_{index:000}.log").ToArray();
+        Check(Directory.GetFiles(fixture.DirectoryPath, "*.log").Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(expected),
+            "Conservar solo los tres archivos más recientes, incluido el activo, y eliminar el más antiguo.");
     }
-    using var cancellation = new CancellationTokenSource();
-    cancellation.Cancel();
-    bool cancelled = false;
-    try { await reader.ReadRecentAsync(newName, cancellation.Token); }
-    catch (OperationCanceledException) { cancelled = true; }
-    Check(cancelled, "La navegación puede cancelar la lectura.");
-    File.Delete(Path.Combine(fixture.DirectoryPath, newName));
-    bool missing = false;
-    try { await reader.ReadRecentAsync(newName, CancellationToken.None); }
-    catch (FileNotFoundException) { missing = true; }
-    Check(missing, "La desaparición entre listado y lectura debe ser observable.");
-    Check((await reader.GetFilesAsync(CancellationToken.None)).SequenceEqual(new[] { oldName }), "Actualizar elimina archivos que ya rotaron.");
-    using (var locked = new FileStream(Path.Combine(fixture.DirectoryPath, oldName), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+    Check(!AppLog.HasWriteFailure, "Rotar sin errores ni pérdidas del evento que abre el siguiente archivo.");
+    return Task.CompletedTask;
+
+    void WriteSession(string message)
     {
-        bool failed = false;
-        try { await reader.ReadRecentAsync(oldName, CancellationToken.None); }
-        catch (IOException) { failed = true; }
-        Check(failed, "No ocultar fallos de acceso al archivo.");
+        AppLog.Initialize(fixture.DirectoryPath);
+        try { Log.Information("{TestMessage}", message); }
+        finally { Log.CloseAndFlush(); }
     }
-    Check((await reader.ReadRecentAsync(oldName, CancellationToken.None)).Entries.Count == 1, "Permitir recuperación después de liberar el archivo.");
 });
 
 await Run("Logs: errores sin secretos y vaciado de la cola al cerrar", () =>
@@ -1548,21 +1479,24 @@ await Run("Logs: errores sin secretos y vaciado de la cola al cerrar", () =>
         Log.CloseAndFlush();
     }
     string[] lines = Directory.GetFiles(logsPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
-    Check(lines.Length == 41, "El cierre vacía los eventos pendientes y filtra Debug por defecto.");
+    Check(lines.Count(line => line.Contains("[INFO]")) == 40 && lines.Count(line => line.Contains("[ERROR]")) == 1,
+        "El cierre vacía los eventos pendientes y filtra Debug por defecto.");
     string text = string.Join('\n', lines);
     foreach (string secret in new[] { "CLAVE_FICTICIA", "TOKEN_FICTICIO", "TARJETA_PRIVADA_FICTICIA", "CONFIGURACION_PRIVADA_FICTICIA", "mock.invalid", "DETALLE_SOLO_DEBUG" })
     {
         Check(!text.Contains(secret, StringComparison.Ordinal), "Excluir mensajes, datos, URL e interiores de excepciones.");
     }
-    Match header = Regex.Match(lines[0], @"^(?<timestamp>\d{4}-\d{2}-\d{2} \S+ [+-]\d{2}:\d{2}) \[ERR\] \[s:[a-f0-9]{8} c:comproba\] Program: ",
+    Match header = Regex.Match(lines[0], @"^(?<timestamp>\d{4}-\d{2}-\d{2} \S+ [+-]\d{2}:\d{2}) \[ERROR\] \[s:[a-f0-9]{8} c:comproba\] Program: ",
         RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
     Check(header.Success && DateTimeOffset.TryParse(header.Groups["timestamp"].Value, out _), "Cabecera compacta con fecha, nivel y componente.");
     Check(lines[0].Contains($"tipo={typeof(HttpRequestException).FullName}"), "Conservar el tipo técnico legible.");
     Check(lines[0].Contains(" c:comproba]"), "Propagar correlación abreviada.");
     Check(Regex.IsMatch(lines[0], @"\[s:[a-f0-9]{8} c:", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) &&
         !AppLog.HasWriteFailure, "Identificar sesión sin fallos del logger.");
-    Check(lines[1].Contains("[INF]") && !lines[1].Contains("TrelloNotifier.Services.SettingsStore") &&
-        lines[1].Contains("SettingsStore: Evento de prueba 0"), "Mostrar nombre corto y mensaje sin JSON.");
+    Check(text.Contains("System.IO.IOException") && !text.Contains("métodos="), "Mostrar interiores saneados sin la lista manual de métodos.");
+    string firstInfo = lines.First(line => line.Contains("[INFO]"));
+    Check(!firstInfo.Contains("TrelloNotifier.Services.SettingsStore") &&
+        firstInfo.Contains("SettingsStore: Evento de prueba 0"), "Mostrar nombre corto y mensaje sin JSON.");
     return Task.CompletedTask;
 });
 
@@ -1580,11 +1514,72 @@ await Run("Logs: modo diagnóstico y timeout como advertencia", () =>
         Log.CloseAndFlush();
     }
     string[] lines = Directory.GetFiles(fixture.DirectoryPath, "*.log").SelectMany(File.ReadAllLines).ToArray();
-    Check(lines.Length == 2, "Debug habilitado explícitamente.");
-    Check(lines[0].Contains("[DBG]"), "Conservar detalle diagnóstico.");
-    Check(lines[1].Contains("[WRN]"), "Timeout recuperable como advertencia.");
-    Check(!lines[1].Contains("URL_PRIVADA_FICTICIA"), "No filtrar datos en timeout.");
+    Check(lines.Count(line => line.Contains("[DEBUG]")) == 1 && lines.Count(line => line.Contains("[WARN]")) == 1,
+        "Debug habilitado explícitamente.");
+    Check(lines[0].Contains("[DEBUG]"), "Conservar detalle diagnóstico.");
+    Check(lines[1].Contains("[WARN]"), "Timeout recuperable como advertencia.");
+    Check(lines.All(line => !line.Contains("URL_PRIVADA_FICTICIA")), "No filtrar datos en timeout.");
     return Task.CompletedTask;
+});
+
+await Run("Logs: excepciones nativas saneadas conservan trazas e interiores y corrigen contexto XAML", async () =>
+{
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().Enrich.With(new CompactLogEnricher()).WriteTo.Sink(sink).CreateLogger();
+    Exception? original = null;
+    try
+    {
+        try { await ThrowOuterAsync(); }
+        catch (Exception ex)
+        {
+            original = ex;
+            AppLog.WriteFailure("UnhandledUI", ex, Serilog.Events.LogEventLevel.Fatal, @"C:\PERFIL_PRIVADO\App.xaml.cs");
+            AppLog.WriteFailure("UnhandledProcess", new AggregateException("AGREGADO_PRIVADO", ex, new IOException("OTRO_PRIVADO")),
+                sourcePath: @"C:\PERFIL_PRIVADO\SettingsPage.xaml.cs");
+            AppLog.WriteFailure("UnknownCaller", ex, sourcePath: "");
+        }
+    }
+    finally { Log.CloseAndFlush(); }
+    var events = sink.Events.ToArray();
+    Check(events.Length == 3 && events[0].Level == Serilog.Events.LogEventLevel.Fatal, "Un evento por fallo con nivel original.");
+    Check(((Serilog.Events.ScalarValue)events[0].Properties["ShortSourceContext"]).Value as string == "App" &&
+        ((Serilog.Events.ScalarValue)events[1].Properties["ShortSourceContext"]).Value as string == "SettingsPage" &&
+        ((Serilog.Events.ScalarValue)events[2].Properties["SourceContext"]).Value as string == "UnhandledException",
+        "Identificar App, páginas XAML y el contexto desconocido sin mostrar xaml.");
+    Exception safe = events[0].Exception!;
+    Check(safe is not null && !ReferenceEquals(safe, original) && safe.InnerException is not null &&
+        !ReferenceEquals(safe.InnerException, original!.InnerException), "Entregar a Serilog una cadena independiente de Exception, no texto preformateado.");
+    string rendered = safe!.ToString();
+    Check(rendered.Contains("System.InvalidOperationException") && rendered.Contains("System.IO.IOException") &&
+        rendered.Contains("ThrowOuterAsync") && rendered.Contains("ThrowInnerAsync") &&
+        rendered.Contains(new System.Diagnostics.StackTrace(original!, false).ToString()),
+        "Conservar tipos y trazas async formateadas por el runtime.");
+    Check(events[1].Exception is AggregateException { InnerExceptions.Count: 2 }, "Conservar todas las ramas de AggregateException.");
+    foreach (var item in events)
+    {
+        string text = item.RenderMessage() + item.Exception;
+        foreach (string secret in new[] { "MENSAJE_PRIVADO", "INTERIOR_PRIVADO", "DATO_PRIVADO", "AGREGADO_PRIVADO", "OTRO_PRIVADO", "PERFIL_PRIVADO", ".cs:line", "métodos=" })
+            Check(!text.Contains(secret, StringComparison.Ordinal), "Excluir mensajes, datos, rutas y formateo manual.");
+        Check(item.Exception!.Data.Count == 0, "No copiar Data a la excepción saneada.");
+    }
+    Check(original!.Message == "MENSAJE_PRIVADO" && original.Data.Count == 1, "No modificar la excepción usada por el flujo de la aplicación.");
+
+    static async Task ThrowInnerAsync()
+    {
+        await Task.Yield();
+        throw new IOException("INTERIOR_PRIVADO");
+    }
+
+    static async Task ThrowOuterAsync()
+    {
+        try { await ThrowInnerAsync(); }
+        catch (IOException ex)
+        {
+            var outer = new InvalidOperationException("MENSAJE_PRIVADO", ex);
+            outer.Data["private"] = "DATO_PRIVADO";
+            throw outer;
+        }
+    }
 });
 
 await Run("Logs: destino inaccesible no impide operar y permite recuperación", () =>
@@ -1652,7 +1647,7 @@ await Run("Logs: monitor correlaciona fallo y recuperación sin datos de tarjeta
     {
         Check(!line.Contains("TARJETA_SECRETA_FICTICIA") && !line.Contains("Fallo de conexión simulado"), "Excluir contenido privado del flujo real.");
         Match correlation = Regex.Match(line, @" c:(?<id>[a-f0-9]{8})\]", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        if (line.Contains("[ERR]"))
+        if (line.Contains("[ERROR]"))
         {
             errorCount++;
             failedCheckId = correlation.Groups["id"].Value;
@@ -1756,6 +1751,59 @@ await Run("Logs: ciclos sin cambios quedan en Debug y los cambios y recuperació
     var levels = sink.Events.Where(item => item.Properties.ContainsKey("EvaluatedCount")).Select(item => item.Level).ToArray();
     Check(levels.SequenceEqual(new[] { Serilog.Events.LogEventLevel.Information, Serilog.Events.LogEventLevel.Debug,
         Serilog.Events.LogEventLevel.Information, Serilog.Events.LogEventLevel.Information }), "Informar primer estado, cambios y recuperación; reducir rutina.");
+});
+
+await Run("Logs: cooldown repetido queda en Debug y cambios de conjunto o conteos vuelven a Information", async () =>
+{
+    using var fixture = new Fixture();
+    using var monitor = fixture.CreateMonitor();
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Sink(sink).CreateLogger();
+    try
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TrelloCard overdue = Card("vencida-privada", now.AddDays(-1));
+        TrelloCard upcoming = Card("proxima-privada", now.AddMinutes(10));
+        fixture.Api.Cards = new[] { overdue, upcoming };
+        fixture.Store.SaveNotifiedCards(new()
+        {
+            [ReminderSchedule.GetKey(overdue)] = now,
+            [ReminderSchedule.GetKey(upcoming)] = now
+        });
+        AppSettings settings = fixture.Store.Load();
+        settings.IncludeOverdueCards = true;
+        settings.NotifyBeforeMinutes = 5;
+        fixture.Store.Save(settings);
+        await monitor.CheckNowAsync(); // Primera candidata: vencida, en cooldown.
+        await monitor.CheckNowAsync(); // Mismo estado.
+        settings.IncludeOverdueCards = false;
+        settings.NotifyBeforeMinutes = 15;
+        fixture.Store.Save(settings);
+        await monitor.CheckNowAsync(); // Mismos conteos, otra tarjeta en cooldown.
+        await monitor.CheckNowAsync();
+        fixture.Api.Cards = new[] { upcoming, overdue };
+        await monitor.CheckNowAsync(); // Cambiar el orden no cambia el conjunto.
+        fixture.Store.SaveNotifiedCards(new());
+        await monitor.CheckNowAsync(); // Aviso enviado.
+        await monitor.CheckNowAsync(); // Transición a cooldown.
+        await monitor.CheckNowAsync(); // Repetición en cooldown.
+        fixture.Api.Cards = new[] { upcoming, overdue, upcoming };
+        await monitor.CheckNowAsync(); // Cambian conteos aunque no cambie el conjunto de tarjetas.
+        await monitor.CheckNowAsync();
+        settings.NotificationsEnabled = false;
+        fixture.Store.Save(settings);
+        await monitor.CheckNowAsync();
+        await monitor.CheckNowAsync();
+    }
+    finally { Log.CloseAndFlush(); }
+    var summaries = sink.Events.Where(item => item.Properties.ContainsKey("EvaluatedCount")).ToArray();
+    Check(string.Join(",", summaries.Select(item => item.Level)) ==
+        "Information,Debug,Information,Debug,Debug,Information,Information,Debug,Information,Debug,Information,Debug",
+        "Informar envíos y transiciones; reducir repeticiones incluso con candidatas, cooldown o avisos desactivados.");
+    Check(((Serilog.Events.ScalarValue)summaries[0].Properties["CandidateCount"]).Value!.Equals(1) &&
+        ((Serilog.Events.ScalarValue)summaries[2].Properties["CandidateCount"]).Value!.Equals(1), "Detectar el cambio de conjunto aunque el conteo de candidatas sea idéntico.");
+    Check(fixture.Notifications.Batches.Count == 1 && summaries.All(item => !item.RenderMessage().Contains("privada")),
+        "La comparación no cambia los envíos ni escribe identificadores privados.");
 });
 
 await Run("Logs: parada espera la comprobación manual antes de vaciar el archivo", async () =>

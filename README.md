@@ -100,53 +100,58 @@ Referencia: [documentación oficial de autorización de Trello](https://develope
 
 ## Logs y diagnóstico
 
-Abre **Diagnóstico** en el menú lateral para consultar los logs dentro de la app.
-Selecciona un archivo y filtra por nivel: **INFO** en azul, **WARN** en amarillo,
-**ERROR/FATAL** en rojo; **DEBUG/TRACE** y líneas sin cabecera se muestran en tono neutro.
-Cada fila muestra fecha/hora local, componente y mensaje seleccionable para copiar.
-El botón **Copiar** de cada registro copia la línea original completa al portapapeles,
-incluidos fecha y zona horaria, nivel, componente e identificadores de correlación.
-**Actualizar** renueva la lista de archivos y los registros del archivo seleccionado;
-la vista carga al entrar y no realiza sondeo automático.
-
-Se muestran primero las líneas más recientes, hasta **1000 líneas completas de los
-últimos 2 MiB** de cada archivo, con un aviso cuando se limita la lectura. El filtro
-se aplica a ese conjunto cargado. Los archivos rotados también se pueden seleccionar.
-Una línea que aún se está escribiendo aparece al actualizar después de completarse.
-
-Los logs se guardan automáticamente en:
+Los logs se consultan directamente en los archivos `.log` con un editor de texto.
+Se guardan automáticamente en:
 
 ```text
-%LOCALAPPDATA%\Trello Notifier\Logs\trello-notifier-AAAAMMDD.log
+%LOCALAPPDATA%\Trello Notifier\Logs\trello-notifier.log
 ```
 
-Al iniciar la aplicación se registra una única línea con la versión del ensamblado:
-`Aplicación iniciada. Versión 1.1.1`. El registro incluye fecha, nivel y componente,
-sin banner ASCII ni filas adicionales sin fecha en Diagnóstico. Los banners de
-ejecuciones anteriores permanecen en los archivos antiguos hasta su rotación.
+Cada inicio de la aplicación registra un banner ASCII de **Trello Notifier**, con la versión
+del ensamblado y del runtime .NET, junto con WinUI 3 y Serilog. Se escribe como un único evento
+Information multilínea, después de configurar el logger y la sesión.
 
-Los eventos usan texto compacto: fecha con zona horaria, nivel (`INF`, `WRN`,
-`ERR`, `DBG`, `FTL`), correlación, nombre corto del componente y mensaje.
+Los eventos usan texto compacto: fecha con zona horaria, nivel (`INFO`, `WARN`,
+`ERROR`, `DEBUG`, `FATAL`; `TRACE` para Verbose), correlación, nombre corto del componente y mensaje.
 Por ejemplo, con identificadores ficticios:
 
 ```text
-2026-11-21 14:30:00.123 -05:00 [INF] [s:45120f6a] DueCardMonitor: Monitor iniciado
-2026-11-21 14:30:01.462 -05:00 [INF] [s:45120f6a c:9b996914] DueCardMonitor: Evaluadas: 38 | Candidatas: 3 | Avisos enviados: 0 (3 en cooldown) (1339 ms)
+2026-11-21 14:30:00.010 -05:00 [INFO] [s:45120f6a] App: Aplicación iniciada.
+
+  _______       _ _         _   _       _   _  __ _
+ |__   __|     | | |       | \ | |     | | (_)/ _(_)
+    | |_ __ ___| | | ___   |  \| | ___ | |_ _| |_ _  ___ _ __
+    | | '__/ _ \ | |/ _ \  | . ` |/ _ \| __| |  _| |/ _ \ '__|
+    | | | |  __/ | | (_) | | |\  | (_) | |_| | | | |  __/ |
+    |_|_|  \___|_|_|\___/  |_| \_|\___/ \__|_|_| |_|\___|_|
+
+Trello Notifier v1.1.1
+Powered by .NET 6.0.36 | WinUI 3 | Serilog
+
+2026-11-21 14:30:00.123 -05:00 [INFO] [s:45120f6a] DueCardMonitor: Monitor iniciado
+2026-11-21 14:30:01.462 -05:00 [INFO] [s:45120f6a c:9b996914] DueCardMonitor: Evaluadas: 38 | Candidatas: 3 | Avisos enviados: 0 (3 en cooldown) (1339 ms)
 ```
 
 Se registran inicio, versión, cierre normal, resultados HTTP, comprobaciones del monitor, envío de
 avisos y fallos. `s:` identifica la ejecución y `c:` relaciona los eventos de una
 comprobación; se muestran ocho caracteres y se omite `c:` fuera del ciclo.
 `SessionId`, `CheckId` y `SourceContext` conservan sus valores completos como
-propiedades del evento. Los GET correctos y ciclos sin candidatos ni cambios
-quedan en Debug. El resumen diferencia notificaciones agrupadas, tarjetas
+propiedades del evento. Los GET correctos y ciclos sin envíos ni cambios
+quedan en Debug, también cuando se repite el mismo cooldown. Se comparan conteos
+y el conjunto de tarjetas en cooldown; el primer estado, los cambios, los envíos
+y la recuperación tras un fallo aparecen en Information. El resumen diferencia notificaciones agrupadas, tarjetas
 notificadas, cooldown, deduplicación y preferencias desactivadas.
 Que Windows acepte un aviso no demuestra que el
 usuario lo haya visto.
 
-- Rotación diaria y al alcanzar aproximadamente **5 MiB**; se conservan los
-  **14 archivos** más recientes (no necesariamente 14 días). Un evento puede
-  superar el umbral antes de abrir el siguiente archivo.
+- Rotación únicamente por tamaño, al alcanzar aproximadamente **5 MiB** por archivo.
+  Se conservan **3 archivos**, incluido el activo. Los siguientes se llaman
+  `trello-notifier_001.log`, `trello-notifier_002.log`, etc.; al abrir un cuarto
+  archivo se elimina el más antiguo. Reiniciar la app o cambiar de día no crea
+  otro archivo si el activo todavía tiene espacio. Un evento completo puede superar
+  ligeramente el umbral antes de abrir el siguiente archivo.
+  Los archivos diarios anteriores (`trello-notifier-AAAAMMDD.log`) pertenecen al
+  esquema antiguo y no se eliminan automáticamente con esta nueva serie.
 - Nivel **Information** por defecto. Para habilitar **Debug**, define la variable
   de entorno `TRELLO_NOTIFIER_LOG_LEVEL=Debug` antes de iniciar la aplicación.
   Al quitarla y reiniciar se vuelve al nivel normal. No cambia la base de datos.
@@ -157,7 +162,9 @@ usuario lo haya visto.
 - HTTP registra método, plantilla de ruta sin IDs privados, estado y duración.
   No se registran credenciales, URLs completas, contenido de tarjetas, configuración ni
   mensajes completos de excepciones. Los errores conservan operación, tipo,
-  código y métodos de la app, sin rutas de archivos ni excepciones internas.
+  código y trazas nativas sin rutas de archivos. Serilog recibe una copia saneada
+  de la excepción y sus interiores (hasta 16 niveles), sin mensajes originales ni Data.
+  Los componentes XAML se identifican como `App`, `SettingsPage`, etc., no como `xaml`.
 - Un fallo del logger no impide usar la aplicación. Si se detecta al arrancar,
   se muestra un aviso; los fallos internos o de cola también generan una advertencia
   genérica mediante `Trace`, visible con un listener de diagnóstico, sin datos privados.

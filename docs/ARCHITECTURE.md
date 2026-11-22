@@ -11,7 +11,6 @@ MainPage → CreateCardPage → SettingsStore / TrelloApiClient
 MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
 CreateCardPage / BulkCreateCardPage → GeminiCardClient → HTTP Gemini (solo propuestas)
 BulkCreateCardPage / CardCsvImporter / GeminiCardClient → CardBatchPreparer
-MainPage → DiagnosticsPage → AppLogReader → archivos locales de AppLog
 App / páginas → AppServices (composición de instancias concretas)
 DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
 DashboardPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
@@ -74,25 +73,22 @@ El esquema SQLite 3 añade `GeminiApiKey` y `GeminiModel`; migra v1/v2 transacci
 `App` inicializa `Services/AppLog` antes de usar `AppServices` y vacía Serilog al
 cerrar o ante un fallo fatal. El cierre normal de ventana espera `Monitor.StopAsync()`
 antes de disponer notificaciones y vaciar el logger; `ProcessExit` es un respaldo.
+Solo el cierre ordenado registra «Aplicación cerrada»; el respaldo de salida y un
+fallo fatal no se presentan como un cierre normal.
 Los servicios y las fronteras de UI usan el logger
 compartido; modelos y calendario siguen sin logging. `AppLog` configura texto `.log` en
 LocalAppData con Serilog File + Async (cola limitada no bloqueante), limita los
-datos de excepción a propiedades técnicas y observa fallos internos sin copiar
-su contenido. `LogContext` propaga `SessionId` al arrancar y `CheckId` dentro de una
+datos de excepción a copias saneadas con trazas nativas sin rutas, mensajes originales
+ni Data y observa fallos internos del logger sin copiar su contenido.
+`LogContext` propaga `SessionId` al arrancar y `CheckId` dentro de una
 comprobación; una propiedad global de sesión respalda callbacks nativos sin contexto.
 `CompactLogEnricher` añade el nombre corto y la correlación de presentación sin
-modificar las propiedades originales. El lector admite cabeceras nuevas y antiguas. Los
+modificar las propiedades originales. Los
 errores se registran donde se capturan y los servicios añaden resultados/tiempos.
 No se incorpora un contenedor DI ni persistencia de logs en SQLite.
 
-`DiagnosticsPage` accede al lector compartido de `AppServices` y reutiliza los colores
-y estados visuales de las filas. `AppLog` expone el directorio configurado y el prefijo
-de archivos para que escritura y lectura tengan un único origen. `AppLogReader`
-enumera solo archivos del logger, interpreta su cabecera y devuelve
-`DiagnosticLogSnapshot`/`DiagnosticLogEntry` sin dependencias de UI. Lee en el pool de
-hilos, comparte el archivo con el escritor y limita cada lectura a los últimos 2 MiB
-y 1000 líneas completas. Las líneas sin cabecera se conservan como Otros; ERROR/FATAL
-comparten gravedad. La vista filtra en memoria, cancela al salir y actualiza bajo demanda.
+La consulta de logs se realiza directamente en los archivos `.log` con herramientas
+externas; la aplicación no incluye una vista ni un servicio de lectura de logs.
 
 ## Responsabilidades y dependencias
 | Área | Permitido actualmente | No introducir |

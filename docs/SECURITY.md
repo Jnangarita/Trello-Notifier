@@ -45,10 +45,8 @@ los archivos auxiliares `.db-journal`, `.db-wal` y `.db-shm`.
 
 ## Información sensible y errores
 
-El visor de Diagnóstico lee únicamente los archivos `trello-notifier-AAAAMMDD[_NNN].log`
-del directorio configurado por `AppLog`; no admite rutas proporcionadas por el usuario.
-Lee como máximo 2 MiB por archivo, muestra texto literal y no ejecuta enlaces ni contenido.
-Las pruebas del lector usan archivos ficticios; no cargar logs reales en contexto de IA.
+Los logs se consultan directamente en los archivos generados por `AppLog`.
+Las pruebas del logger usan datos ficticios; no cargar logs reales en contexto de IA.
 
 La importación CSV lee solo el archivo elegido por el usuario, comprueba el límite de
 2 MiB antes de cargarlo y admite hasta 1000 filas. No se registran ruta, contenido ni
@@ -59,9 +57,13 @@ de creación manual se limitan a HTTPS de Trello mediante `TrelloCard.TrelloUri`
 No registrar contraseñas, access tokens, query strings autenticadas, nombres de
 tarjetas privadas ni dumps de configuración. La API usa credenciales en query:
 excluir URL completa en diagnósticos. `AppLog.WriteFailure` usa una lista permitida
-de propiedades técnicas (operación constante, tipo, HResult y métodos sin rutas),
-sin mensaje, Data ni excepciones internas. Serilog escribe texto `.log` en LocalAppData
-con rotación, retención de 14 archivos y cola limitada; su diagnóstico interno
+de propiedades técnicas (operación constante, tipo y HResult). Entrega a Serilog una
+copia saneada de la excepción y sus interiores, incluidas ramas de AggregateException,
+limitada a 16 niveles: mensajes sustituidos por tipo/código, sin Data ni propiedades
+privadas. Las trazas se generan con `StackTrace(exception, false)`, sin rutas ni líneas
+de archivos, y el runtime/Serilog formatea las excepciones. Nunca se retiene la excepción
+original en el evento. Serilog escribe texto `.log` en LocalAppData
+con rotación solo por tamaño (5 MiB), retención de 3 archivos de la nueva serie y cola limitada; su diagnóstico interno
 se sustituye por una advertencia fija para no revelar rutas o excepciones.
 Los archivos `*.log` y los antiguos `trello-notifier-*.jsonl` están excluidos de Git y búsquedas.
 Ya no se escribe `crash.log`; las copias antiguas pueden contener excepciones

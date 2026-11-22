@@ -40,9 +40,7 @@ JSON estructurado, 20 000 caracteres / 50 tarjetas / 1 MiB de respuesta / 60 s.
 La creación individual confirma el reemplazo del formulario; el lote lleva a revisión.
 Las páginas cancelan al salir; responsables/etiquetas se eligen con datos de Trello.
 `Styles.xaml` contiene los estilos compartidos.
-`DiagnosticsPage` consulta logs locales vía `AppLogReader`, con selector de archivo,
-filtro por nivel y colores del tema. Lee en segundo plano hasta 1000 líneas completas
-de los últimos 2 MiB; actualiza al entrar o bajo demanda y cancela al navegar.
+Los logs se consultan directamente en los archivos `.log`; no hay un visor dentro de la app.
 
 `Models/` contiene `AppSettings`, `TrelloCard` (también DTO JSON; `closed` es
 independiente de `dueComplete`; `GetStatus` clasifica vencimientos con
@@ -61,11 +59,13 @@ el monitor sigue consultando tarjetas sin enviar ni registrar avisos. Los fallos
 y el monitor ejecutan el IO SQLite síncrono fuera del hilo UI. `DesktopNotificationService`
 encapsula las notificaciones de Windows y usa `App.GetAssetPath` para el icono.
 
-`AppLog` configura Serilog File + Async: texto `.log` estilo Spring Boot en `%LOCALAPPDATA%\Trello Notifier\Logs`,
-rotación diaria/5 MiB, 14 archivos y cola no bloqueante de 1000 eventos. `App`
+`AppLog` configura Serilog File + Async: texto `.log` compacto en `%LOCALAPPDATA%\Trello Notifier\Logs`,
+rotación solo por tamaño (umbral de 5 MiB), 3 archivos y cola no bloqueante de 1000 eventos. `App`
 inicializa y vacía el logger; `CheckId` correlaciona el monitor. Registrar errores
-con `AppLog.WriteFailure` (tipo/código/métodos sin mensajes ni rutas), no pasar
-excepciones completas a Serilog. `TRELLO_NOTIFIER_LOG_LEVEL=Debug` habilita detalle.
+con `AppLog.WriteFailure` (excepción saneada con tipo/código, traza nativa e interiores
+sin mensajes originales, Data ni rutas), no pasar excepciones originales a Serilog.
+`TRELLO_NOTIFIER_LOG_LEVEL=Debug` habilita detalle. El monitor reduce a Debug los ciclos
+sin envíos ni cambios de conteos/conjuntos, incluso en cooldown.
 
 ## Estado actual frente a diagnósticos históricos
 Consultar [estado y problemas conocidos](../docs/KNOWN_ISSUES.md) para distinguir

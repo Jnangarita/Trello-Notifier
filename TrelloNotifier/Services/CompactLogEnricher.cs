@@ -7,6 +7,18 @@ internal sealed class CompactLogEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
+        string level = logEvent.Level switch
+        {
+            LogEventLevel.Verbose => "TRACE",
+            LogEventLevel.Debug => "DEBUG",
+            LogEventLevel.Information => "INFO",
+            LogEventLevel.Warning => "WARN",
+            LogEventLevel.Error => "ERROR",
+            LogEventLevel.Fatal => "FATAL",
+            _ => logEvent.Level.ToString().ToUpperInvariant()
+        };
+        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("LevelLabel", level));
+
         string source = GetString(logEvent, "SourceContext");
         int separator = Math.Max(source.LastIndexOf('.'), source.LastIndexOf('+'));
         logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("ShortSourceContext", source[(separator + 1)..]));

@@ -25,18 +25,23 @@ No agregar catches vacíos generalizados ni cambiar esta política inadvertidame
 Serilog escribe texto `.log` compacto mediante `AppLog`, con File y Async para rotación y
 cola limitada. Usar plantillas constantes y propiedades técnicas o conteos.
 Registrar errores una vez en la frontera que los captura (monitor, página o
-manejador global) con `AppLog.WriteFailure`, nunca pasando la excepción a Serilog
-ni copiando `Message`, `Data`, `ToString()` o excepciones internas. El helper
-conserva tipo, HResult y métodos sin rutas. Los servicios pueden registrar
+manejador global) con `AppLog.WriteFailure`, nunca pasando la excepción original
+a Serilog ni copiando sus mensajes, `Data` o `ToString()`. El helper crea una cadena
+de excepciones saneadas con tipo/HResult y stack trace nativo sin información de
+archivos; también sanea interiores y ramas de AggregateException (hasta 16 niveles).
+Serilog formatea esa copia mediante `{Exception}`, sin concatenar métodos. Los servicios pueden registrar
 resultados, tiempos y conteos sin repetir el error. La inicialización de
 notificaciones registra el error que absorbe. La cancelación solicitada no se
 registra como fallo; los timeouts se registran como Warning.
 Usar `Log.ForContext<T>()` para identificar el componente. La plantilla muestra
-fecha con zona, nivel de tres letras, correlación abreviada y componente corto.
+fecha con zona, nivel (`INFO`, `WARN`, `ERROR`, `DEBUG`, `FATAL` o `TRACE`),
+correlación abreviada y componente corto. `App` registra un banner con la versión
+como un único evento Information al iniciar cada ejecución.
 `CompactLogEnricher` conserva los valores completos de `SourceContext`, `SessionId`
 y `CheckId`; usar `LogContext` para correlación, sin añadir IDs al mensaje.
-GET correctos y ciclos sin candidatos ni cambios se registran en Debug. `WriteFailure`
-reduce CallerFilePath al nombre del componente, sin escribir la ruta de compilación.
+GET correctos y ciclos sin envíos ni cambios se registran en Debug, incluso si hay
+candidatas en cooldown. El monitor compara conteos y conjuntos, sin registrar IDs de tarjetas.
+`WriteFailure` reduce CallerFilePath al componente (también quita `.xaml`), sin escribir la ruta de compilación.
 Para HTTP usar plantillas de rutas permitidas sin IDs ni query, nunca nombres CLR genéricos.
 No registrar URLs completas, configuración ni payloads con información privada.
 

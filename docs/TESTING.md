@@ -149,16 +149,6 @@ anterior se retiró al modificar la carga de preferencias para SQLite.
 
 ## Comprobación manual cuando cambie UI
 
-En **Diagnóstico**, usar archivos ficticios del formato de `AppLog`: comprobar INFO
-azul, WARN amarillo, ERROR/FATAL rojo y DEBUG/TRACE/líneas sin cabecera neutros en temas
-claro, oscuro y contraste. Cambiar archivo/nivel, actualizar, seleccionar texto y
-desplazar la lista para verificar colores al reciclar filas. Probar ventana estrecha,
-carpeta/archivo vacíos, desaparición por rotación, acceso bloqueado y navegación durante
-la carga. El runner cubre el formato real de Serilog, interpretación de cabeceras,
-orden, BOM/UTF-8, límites de bytes/líneas, escritura concurrente, líneas incompletas,
-nombres de archivo restringidos, cancelación y recuperación tras rotación/bloqueo,
-siempre en la carpeta temporal de `Fixture`.
-
 En **Creación masiva**, usar un CSV de ejemplo sin datos privados y un mock local:
 elegir/cancelar archivos, arrastrar un único CSV (rechazar varios archivos o carpetas),
 guardar plantilla/resultados, probar UTF-8 con BOM, comillas,
@@ -261,15 +251,21 @@ No sustituir la suite por `dotnet test TrelloNotifier.sln`.
 ## Logging
 
 El runner enlaza `AppLog` real y usa Serilog File/Async en carpetas de `Fixture`.
+Comprueba reutilización del archivo entre arranques y rotación al alcanzar 5 MiB,
+manteniendo solo los tres archivos más recientes de la serie, incluido el activo.
 Comprueba que el cierre vacía la cola, que los niveles Information/Debug y los
 timeouts se distinguen, que un destino inaccesible no impide usar persistencia
 y que el monitor correlaciona fallo/recuperación sin falsas alarmas al cancelar.
 Los errores usan secretos ficticios en Message, Data y excepciones internas
 para verificar su ausencia en los archivos de texto; también se comprueba la cabecera
-compacta, la compatibilidad con archivos antiguos, el componente corto y la correlación.
+compacta escrita en el archivo, el componente corto y la correlación.
 Se verifica aislamiento de scopes paralelos, conservación de propiedades completas,
 conteos de avisos agrupados/cooldown/deduplicación/desactivación/rechazo, reducción
 de rutina a Debug y espera de una comprobación manual durante el cierre.
+Las regresiones verifican contextos XAML, entrega de excepciones saneadas a Serilog,
+trazas e interiores/ramas agregadas sin mensajes privados, y cambios del conjunto
+en cooldown con conteos idénticos. También cubren repeticiones, cambio de orden,
+transición tras un envío y avisos desactivados.
 No se leen logs ni configuración del usuario.
 No se consulta la API real ni se emiten notificaciones Windows en estas pruebas.
 

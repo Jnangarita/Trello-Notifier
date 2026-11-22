@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Events;
@@ -8,7 +9,7 @@ namespace TrelloNotifier.Services;
 
 internal static class AppLog
 {
-    public const string FileNamePrefix = "trello-notifier-";
+    public const string FileName = "trello-notifier.log";
     private static readonly string DefaultDirectoryPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Trello Notifier", "Logs");
     private static int _hasWriteFailure;
@@ -36,13 +37,13 @@ internal static class AppLog
                 .Enrich.WithProperty("SourceContext", "TrelloNotifier")
                 .Enrich.With(new CompactLogEnricher())
                 .WriteTo.Async(sink => sink.File(
-                    Path.Combine(DirectoryPath, FileNamePrefix + ".log"),
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{Correlation:l}] {ShortSourceContext:l}: {Message:lj}{NewLine}{Exception}",
+                    Path.Combine(DirectoryPath, FileName),
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{LevelLabel:l}] [{Correlation:l}] {ShortSourceContext:l}: {Message:lj}{NewLine}{Exception}",
                     formatProvider: System.Globalization.CultureInfo.InvariantCulture,
-                    rollingInterval: RollingInterval.Day,
+                    rollingInterval: RollingInterval.Infinite,
                     fileSizeLimitBytes: 5 * 1024 * 1024,
                     rollOnFileSizeLimit: true,
-                    retainedFileCountLimit: 14,
+                    retainedFileCountLimit: 3,
                     flushToDiskInterval: TimeSpan.FromSeconds(1),
                     shared: true), bufferSize: 1000, blockWhenFull: false)
                 .CreateLogger();
@@ -57,19 +58,30 @@ internal static class AppLog
     public static void WriteFailure(string operation, Exception exception, LogEventLevel? level = null,
         [CallerFilePath] string sourcePath = "")
     {
-        // Lista permitida: no serializar Exception, Message, Data, rutas ni excepciones internas.
-        // Los métodos sin nombres de archivo permiten localizar el fallo sin revelar el perfil local.
-        string[] frames = new StackTrace(exception, false).GetFrames()
-            .Select(frame => frame.GetMethod())
-            .Where(method => method?.DeclaringType?.Namespace?.StartsWith("TrelloNotifier", StringComparison.Ordinal) == true)
-            .Take(12)
-            .Select(method => $"{method!.DeclaringType!.FullName}.{method.Name}")
-            .ToArray();
-        // CallerFilePath se reduce al componente; nunca se escribe la ruta de compilación.
-        Log.ForContext("SourceContext", Path.GetFileNameWithoutExtension(sourcePath))
+        string source = Path.GetFileNameWithoutExtension(sourcePath);
+        // App.xaml.cs identifica App, no el sufijo xaml que acortaría el enriquecedor.
+        if (source.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase)) source = source[..^5];
+        if (string.IsNullOrWhiteSpace(source)) source = "UnhandledException";
+        Log.ForContext("SourceContext", source)
             .Write(level ?? (exception is OperationCanceledException ? LogEventLevel.Warning : LogEventLevel.Error),
-                "Falló la operación {Operation}; tipo={ErrorType}; código={ErrorCode}; métodos={Frames}",
-                operation, exception.GetType().FullName, exception.HResult, string.Join(" -> ", frames));
+                SanitizeException(exception),
+                "Falló la operación {Operation}; tipo={ErrorType}; código={ErrorCode}",
+                operation, exception.GetType().FullName, exception.HResult);
+    }
+
+    private static Exception SanitizeException(Exception exception, int depth = 0)
+    {
+        // No retener la excepción original: también sus interiores y Data pueden contener secretos.
+        if (depth >= 16) return new Exception("Se omitieron excepciones internas adicionales.");
+        string description = $"{exception.GetType().FullName}; código={exception.HResult}. Mensaje omitido.";
+        Exception safe = exception is AggregateException aggregate
+            ? new AggregateException(description, aggregate.InnerExceptions.Select(inner => SanitizeException(inner, depth + 1)))
+            : new Exception(description, exception.InnerException is { } inner ? SanitizeException(inner, depth + 1) : null);
+        // El runtime formatea los frames (incluido async), sin rutas ni números de línea del PDB.
+        // Serilog recibe una Exception real y usa su formato nativo para la cadena de interiores.
+        string stack = new StackTrace(exception, false).ToString();
+        if (stack.Length > 0) ExceptionDispatchInfo.SetRemoteStackTrace(safe, stack);
+        return safe;
     }
 
     private static void ReportWriteFailure()

@@ -17,7 +17,8 @@ internal sealed class DueCardMonitor : IDisposable
     private volatile bool _stopping;
     private volatile bool _shutdownRequested;
     private HashSet<(string Id, DateTimeOffset? Due, bool Complete, bool Closed)>? _lastCards;
-    private bool? _lastNotificationsEnabled;
+    private HashSet<string>? _lastCooldownKeys;
+    private (int Evaluated, int Candidates, int Cooldown, int Deduplicated, int Disabled, int Rejected, bool Enabled)? _lastSummaryCounts;
     private bool _lastCheckFailed;
 
     public DueCardMonitor(
@@ -204,7 +205,7 @@ internal sealed class DueCardMonitor : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             List<TrelloCard> uniqueCandidates = eligibleCards.DistinctBy(ReminderSchedule.GetKey).ToList();
             int deduplicated = eligibleCards.Count - uniqueCandidates.Count;
-            int cooldown = 0;
+            var cooldownKeys = new HashSet<string>(StringComparer.Ordinal);
             int disabled = 0;
             var reminders = new List<TrelloCard>();
             foreach (TrelloCard card in uniqueCandidates)
@@ -212,8 +213,9 @@ internal sealed class DueCardMonitor : IDisposable
                 if (ReminderSchedule.ShouldNotify(card, settings, notifiedCards, now)) reminders.Add(card);
                 else if (!settings.NotificationsEnabled) disabled++;
                 else if (settings.RepeatReminderMinutes == 0) deduplicated++;
-                else cooldown++;
+                else cooldownKeys.Add(ReminderSchedule.GetKey(card));
             }
+            int cooldown = cooldownKeys.Count;
             operation = "SendDueNotifications";
             bool sent = reminders.Count > 0 && _notifications.ShowDueCards(reminders, settings.PlaySound, now);
             if (sent)
@@ -246,10 +248,12 @@ internal sealed class DueCardMonitor : IDisposable
                 NotifyBeforeMinutes = settings.NotifyBeforeMinutes
             });
             var cardState = cards.Select(card => (card.Id, card.Due, card.DueComplete, card.Closed)).ToHashSet();
-            bool changed = _lastCards is null || !_lastCards.SetEquals(cardState) || _lastNotificationsEnabled != settings.NotificationsEnabled;
             int rejected = sent ? 0 : reminders.Count;
+            var summaryCounts = (cards.Count, eligibleCards.Count, cooldown, deduplicated, disabled, rejected, settings.NotificationsEnabled);
+            bool changed = _lastSummaryCounts != summaryCounts || _lastCards is null || !_lastCards.SetEquals(cardState) ||
+                _lastCooldownKeys is null || !_lastCooldownKeys.SetEquals(cooldownKeys);
             LogEventLevel summaryLevel = rejected > 0 ? LogEventLevel.Warning
-                : eligibleCards.Count > 0 || changed || _lastCheckFailed || notificationStateChanged ? LogEventLevel.Information : LogEventLevel.Debug;
+                : sent || changed || _lastCheckFailed ? LogEventLevel.Information : LogEventLevel.Debug;
             var details = new List<string>();
             if (sent) details.Add($"{reminders.Count} tarjetas notificadas");
             if (cooldown > 0) details.Add($"{cooldown} en cooldown");
@@ -267,7 +271,8 @@ internal sealed class DueCardMonitor : IDisposable
                     cards.Count, eligibleCards.Count, sent ? 1 : 0,
                     details.Count == 0 ? string.Empty : " (" + string.Join(", ", details) + ")", stopwatch.ElapsedMilliseconds);
             _lastCards = cardState;
-            _lastNotificationsEnabled = settings.NotificationsEnabled;
+            _lastSummaryCounts = summaryCounts;
+            _lastCooldownKeys = cooldownKeys;
             _lastCheckFailed = false;
             outcome = "Succeeded";
         }
