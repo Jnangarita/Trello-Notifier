@@ -188,7 +188,7 @@ internal sealed class TrelloApiClient
         {
             string route = GetLogResource(resource);
             if (succeeded)
-                Log.ForContext<TrelloApiClient>().Write(method == HttpMethod.Get ? LogEventLevel.Debug : LogEventLevel.Information,
+                Log.ForContext<TrelloApiClient>().Information(
                     "{Method} {Resource} -> {StatusCode} ({DurationMs} ms)", method.Method, route, statusCode, stopwatch.ElapsedMilliseconds);
             else
                 Log.ForContext<TrelloApiClient>().ForContext("StatusCode", statusCode).Write(failureLevel,

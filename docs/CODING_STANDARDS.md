@@ -39,8 +39,10 @@ correlación abreviada y componente corto. `App` registra un banner con la versi
 como un único evento Information al iniciar cada ejecución.
 `CompactLogEnricher` conserva los valores completos de `SourceContext`, `SessionId`
 y `CheckId`; usar `LogContext` para correlación, sin añadir IDs al mensaje.
-GET correctos y ciclos sin envíos ni cambios se registran en Debug, incluso si hay
-candidatas en cooldown. El monitor compara conteos y conjuntos, sin registrar IDs de tarjetas.
+Las solicitudes HTTP correctas de Trello, incluidos los GET, se registran en Information
+con método, ruta segura, estado y duración. Los ciclos del monitor sin envíos ni cambios
+se registran en Debug, incluso si hay candidatas en cooldown. El monitor compara
+conteos y conjuntos, sin registrar IDs de tarjetas.
 `WriteFailure` reduce CallerFilePath al componente (también quita `.xaml`), sin escribir la ruta de compilación.
 Para HTTP usar plantillas de rutas permitidas sin IDs ni query, nunca nombres CLR genéricos.
 No registrar URLs completas, configuración ni payloads con información privada.

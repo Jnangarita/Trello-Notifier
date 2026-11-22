@@ -27,6 +27,8 @@ cliente de escritura de tarjetas en Trello; reutilizarlo en UI y monitor.
 serialización y logging son compartidos con las consultas. El cliente usa un envío
 común para GET y POST. Los errores HTTP conservan `StatusCode` sin exponer cuerpos
 ni URLs autenticadas. No hay reintentos automáticos de escrituras.
+Las solicitudes exitosas, tanto GET como POST, se registran en Information con método,
+ruta permitida sin IDs ni query, código HTTP y duración; son visibles con el nivel predeterminado.
 
 - `GET /1/members/me/boards?filter=open&fields=name&lists=open`: destinos disponibles.
 - `GET /1/boards/{id}/members?fields=fullName,username`: responsables del tablero.
