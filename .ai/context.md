@@ -21,12 +21,12 @@ La API base puede cambiarse para utilizar un servidor simulado sin credenciales.
 Las páginas usan code-behind, no un framework MVVM. `AppServices` construye
 instancias compartidas de servicios concretos. `App` inicia el monitor y gestiona
 activación/cierre. `MainPage` proporciona navegación, tema e InfoBar.
-`HomeDashboardPage` es la página inicial Dashboard; consulta clima de Open-Meteo
+`DashboardPage` es la página inicial Dashboard; consulta clima de Open-Meteo
 mediante `WeatherClient` compartido, solo al entrar o actualizar. Usa coordenadas
 de entorno (Barranquilla por defecto), caché en memoria de una hora y fallback discreto
 con espera de cinco minutos tras fallo para aperturas normales. El refresco manual
 fuerza HTTP y renueva la caché. No depende del monitor ni de Trello.
-`DashboardPage` muestra pendientes no archivadas del snapshot y reutiliza su UI
+`CardsPage` muestra pendientes no archivadas del snapshot y reutiliza su UI
 para Historial (completadas o archivadas, consulta bajo demanda sin avisos);
 ambas vistas usan paginación local de 10/25/50 filas (25 por defecto), posterior a
 los filtros mediante `MonitorSnapshot.GetCardPage`, sin nuevas consultas ni avisos.

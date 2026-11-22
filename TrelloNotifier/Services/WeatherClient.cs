@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -11,6 +12,7 @@ namespace TrelloNotifier.Services;
 
 internal sealed class WeatherClient : IDisposable
 {
+    private const string ForecastResource = "/v1/forecast";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
     private static readonly TimeSpan FailureCacheDuration = TimeSpan.FromMinutes(5);
     private readonly HttpClient _http;
@@ -62,14 +64,21 @@ internal sealed class WeatherClient : IDisposable
             if (!forceRefresh && _utcNow() < _expiresAt) return _cached;
 
             using var context = LogContext.PushProperty("WeatherRequestId", Guid.NewGuid().ToString("N"));
-            Log.ForContext<WeatherClient>().Information("Consultando clima en Open-Meteo; actualización forzada={ForceRefresh}", forceRefresh);
+            Log.ForContext<WeatherClient>().Information("{Method} {Resource}: consultando clima en Open-Meteo; actualización forzada={ForceRefresh}",
+                HttpMethod.Get.Method, ForecastResource, forceRefresh);
             string url = FormattableString.Invariant(
-                $"https://api.open-meteo.com/v1/forecast?latitude={Location.Latitude}&longitude={Location.Longitude}") +
+                $"https://api.open-meteo.com{ForecastResource}?latitude={Location.Latitude}&longitude={Location.Longitude}") +
                 "&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m&temperature_unit=celsius&wind_speed_unit=kmh&timeformat=unixtime&forecast_days=1";
+            var stopwatch = Stopwatch.StartNew();
+            int? statusCode = null;
+            bool succeeded = false;
+            bool canceled = false;
+            string outcome = "fallo de transporte";
             try
             {
                 // ResponseContentRead limita también el cuerpo (64 KiB) y lo incluye en el timeout.
                 using HttpResponseMessage response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
+                statusCode = (int)response.StatusCode;
                 if (!response.IsSuccessStatusCode)
                     throw new HttpRequestException("No se pudo consultar el clima.", null, response.StatusCode);
                 ForecastResponse? forecast = await response.Content.ReadFromJsonAsync<ForecastResponse>(
@@ -90,17 +99,43 @@ internal sealed class WeatherClient : IDisposable
                     IsDay = current.IsDay != 0
                 };
                 _expiresAt = _utcNow() + CacheDuration;
-                Log.ForContext<WeatherClient>().Information("Clima actualizado; caché válida durante {CacheMinutes} minutos", CacheDuration.TotalMinutes);
+                succeeded = true;
                 return _cached;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                canceled = true;
+                outcome = "cancelada por solicitud";
+                throw;
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or IOException ||
                 (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
             {
-                using var statusContext = LogContext.PushProperty("StatusCode", (ex as HttpRequestException)?.StatusCode);
+                outcome = ex switch
+                {
+                    OperationCanceledException => "tiempo de espera agotado",
+                    JsonException => "respuesta JSON inválida",
+                    HttpRequestException { StatusCode: not null } => "solicitud rechazada",
+                    _ => "fallo de transporte"
+                };
+                using var statusContext = LogContext.PushProperty("StatusCode", statusCode);
                 AppLog.WriteFailure("GetCurrentWeather", ex, LogEventLevel.Warning);
                 _cached = null;
                 _expiresAt = _utcNow() + FailureCacheDuration;
                 return null;
+            }
+            finally
+            {
+                if (succeeded)
+                    Log.ForContext<WeatherClient>().Information(
+                        "{Method} {Resource} -> {StatusCode} ({DurationMs} ms); caché válida durante {CacheMinutes} minutos",
+                        HttpMethod.Get.Method, ForecastResource, statusCode, stopwatch.ElapsedMilliseconds, CacheDuration.TotalMinutes);
+                else
+                    Log.ForContext<WeatherClient>().ForContext("StatusCode", statusCode)
+                        .Write(canceled ? LogEventLevel.Debug : LogEventLevel.Warning,
+                            "{Method} {Resource} -> {HttpResult} ({DurationMs} ms): {Outcome}",
+                            HttpMethod.Get.Method, ForecastResource, statusCode?.ToString(CultureInfo.InvariantCulture) ?? "sin respuesta",
+                            stopwatch.ElapsedMilliseconds, outcome);
             }
         }
         finally

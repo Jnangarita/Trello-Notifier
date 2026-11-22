@@ -6,15 +6,15 @@ Las carpetas son agrupaciones de responsabilidades, no ensamblados/capas de
 Clean Architecture. Hay una base SQLite local; no hay servidor, ORM ni framework de DI/MVVM.
 
 ```text
-App → MainWindow / MainPage → DashboardPage / SettingsPage
-MainPage → HomeDashboardPage → WeatherClient → HTTP Open-Meteo (solo lectura)
+App → MainWindow / MainPage → DashboardPage / CardsPage / SettingsPage
+MainPage → DashboardPage → WeatherClient → HTTP Open-Meteo (solo lectura)
 MainPage → CreateCardPage → SettingsStore / TrelloApiClient
 MainPage → BulkCreateCardPage → CardCsvImporter / SettingsStore / TrelloApiClient
 CreateCardPage / BulkCreateCardPage → GeminiCardClient → HTTP Gemini (solo propuestas)
 BulkCreateCardPage / CardCsvImporter / GeminiCardClient → CardBatchPreparer
 App / páginas → AppServices (composición de instancias concretas)
-DashboardPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
-DashboardPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
+CardsPage → DueCardMonitor → TrelloApiClient → HTTP Trello/mock
+CardsPage (Historial) → SettingsStore, TrelloApiClient (consulta bajo demanda)
 SettingsPage → SettingsStore, TrelloApiClient, notificaciones, monitor
 DueCardMonitor → ReminderSchedule, SettingsStore, DesktopNotificationService
 Services → Models
@@ -34,10 +34,10 @@ para el calendario y los filtros; no depende de la preferencia de avisar vencida
 `MonitorSnapshot` obtiene las opciones de tablero y filtra sus tarjetas por
 ámbito (`TrelloCardScope`), tablero, estado y búsqueda, reutilizando `GetStatus`.
 `GetCardPage` reutiliza ese filtrado y orden para devolver una página local, el
-total filtrado y los límites de navegación. `DashboardPage` conserva la selección
+total filtrado y los límites de navegación. `CardsPage` conserva la selección
 de página y tamaño para ambas vistas y solo crea los viewmodels de las filas visibles.
 Mis tarjetas usa el ámbito pendiente (sin completar ni archivar), también para
-sus indicadores. `DashboardPage` se reutiliza mediante un parámetro de navegación
+sus indicadores. `CardsPage` se reutiliza mediante un parámetro de navegación
 para Historial: consulta todas las asignadas al entrar o actualizar, muestra la
 unión de completadas y archivadas y permite filtrar ambos estados independientes.
 Esa vista no se suscribe al monitor ni dispara recordatorios; cancela su consulta
@@ -46,7 +46,7 @@ al salir y no persiste tarjetas. Ambas vistas reutilizan filas, estilos y
 urgencia temporal. El monitor actualiza controles mediante `DispatcherQueue`.
 La UI contiene coordinación en code-behind.
 
-`HomeDashboardPage` es el Dashboard de inicio, separado de las tablas existentes.
+`DashboardPage` es el Dashboard de inicio, separado de las tablas existentes.
 Obtiene el clima solo desde `AppServices.Weather`. `WeatherClient` posee su propio
 `HttpClient`, valida configuración de entorno y respuesta, serializa cargas con
 `SemaphoreSlim` y conserva una entrada en memoria: una hora si tuvo éxito, cinco

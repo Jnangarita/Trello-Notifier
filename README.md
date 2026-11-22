@@ -202,6 +202,9 @@ usuario lo haya visto.
   el cierre normal espera al monitor y vacía la cola con `Log.CloseAndFlush()`;
   un cierre forzado puede perder los últimos eventos.
 - HTTP registra método, plantilla de ruta sin IDs privados, estado y duración.
+  El clima usa el mismo formato, visible en Information: `GET /v1/forecast -> 200 (123 ms)`.
+  Los fallos incluyen el código HTTP o «sin respuesta» y su motivo; las respuestas
+  desde caché no se registran como llamadas HTTP. Se omiten coordenadas y query.
   No se registran credenciales, URLs completas, contenido de tarjetas, configuración ni
   mensajes completos de excepciones. Los errores conservan operación, tipo,
   código y trazas nativas sin rutas de archivos. Serilog recibe una copia saneada
@@ -576,7 +579,8 @@ La API key y el token siguen **sin cifrar**, ahora dentro de SQLite y también e
 TrelloNotifier/
   Models/                 Configuración y datos de tarjetas
   Services/               API de Trello, monitor, persistencia y avisos
-  DashboardPage.*         Consulta de tarjetas y filtros por estado
+  DashboardPage.*         Dashboard de inicio con clima
+  CardsPage.*             Mis tarjetas e Historial con filtros y paginación
   SettingsPage.*          Credenciales y preferencias
 installer.iss             Instalador para Windows x64
 ```

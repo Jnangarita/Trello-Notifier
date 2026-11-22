@@ -54,7 +54,7 @@ public sealed partial class MainPage : Page
         }
 
         string? tag = (args.InvokedItemContainer as NavigationViewItem)?.Tag as string;
-        if (tag == "Home")
+        if (tag == "Dashboard")
         {
             NavigateToDashboard();
             return;
@@ -65,7 +65,7 @@ public sealed partial class MainPage : Page
 
     private void NavigateToDashboard()
     {
-        if (ContentFrame.Content is HomeDashboardPage || ContentFrame.Navigate(typeof(HomeDashboardPage)))
+        if (ContentFrame.Content is DashboardPage || ContentFrame.Navigate(typeof(DashboardPage)))
             Navigation.Header = "Dashboard";
     }
 
@@ -81,9 +81,9 @@ public sealed partial class MainPage : Page
 
     internal void NavigateToCards(TrelloCardScope scope)
     {
-        if (ContentFrame.Content is not DashboardPage page || page.Scope != scope)
+        if (ContentFrame.Content is not CardsPage page || page.Scope != scope)
         {
-            if (!ContentFrame.Navigate(typeof(DashboardPage), scope)) return;
+            if (!ContentFrame.Navigate(typeof(CardsPage), scope)) return;
         }
 
         Navigation.Header = scope == TrelloCardScope.History ? "Historial" : "Trello Notifier";

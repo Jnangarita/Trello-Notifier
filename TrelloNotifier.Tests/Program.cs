@@ -160,12 +160,92 @@ await Run("Clima: fallos HTTP, red, timeout y JSON dan fallback temporal y permi
         }
     }
     finally { Log.CloseAndFlush(); }
-    var warnings = sink.Events.Where(item => item.Level == Serilog.Events.LogEventLevel.Warning).ToArray();
+    var warnings = sink.Events.Where(item => item.Level == Serilog.Events.LogEventLevel.Warning && item.Properties.ContainsKey("Operation")).ToArray();
     Check(warnings.Length == failures.Length && warnings.All(item => item.Properties.ContainsKey("WeatherRequestId")),
         "Registrar cada fallo una vez y con LogContext.");
     Check(sink.Events.Any(item => item.Level == Serilog.Events.LogEventLevel.Information) &&
         sink.Events.All(item => !item.RenderMessage().Contains("private-weather") &&
             !(item.Exception?.ToString().Contains("private-weather") ?? false)), "Registrar resultados INFO y fallos saneados.");
+});
+
+await Run("Clima: logs HTTP incluyen GET, ruta segura, estado y duración sin simular llamadas de caché", async () =>
+{
+    var sink = new RecordingLogSink();
+    Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().Enrich.FromLogContext().WriteTo.Sink(sink).CreateLogger();
+    using var handler = new GeminiHttpDouble
+    {
+        Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("{\"current\":{\"temperature_2m\":30,\"wind_speed_10m\":1,\"time\":1790000000}}"))
+    };
+    using var client = new WeatherClient(handler, new WeatherLocation(12.34567, -45.67891, "private-weather-location"), () => now);
+    try
+    {
+        await client.GetCurrentAsync(CancellationToken.None);
+        int afterSuccess = sink.Events.Count;
+        await client.GetCurrentAsync(CancellationToken.None);
+        Check(sink.Events.Count == afterSuccess && handler.Calls == 1, "La caché no registra una petición HTTP inexistente.");
+
+        handler.Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("private-weather-body", System.Net.HttpStatusCode.ServiceUnavailable));
+        await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true);
+        int afterFailure = sink.Events.Count;
+        await client.GetCurrentAsync(CancellationToken.None);
+        Check(sink.Events.Count == afterFailure && handler.Calls == 2, "La espera tras fallo tampoco registra nuevas peticiones.");
+
+        handler.Respond = (_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("private-weather-network"));
+        await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true);
+        handler.Respond = (_, _) => Task.FromException<HttpResponseMessage>(new TaskCanceledException("private-weather-timeout"));
+        await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true);
+        handler.Respond = (_, _) => Task.FromResult(GeminiHttpDouble.Json("private-weather-json"));
+        await client.GetCurrentAsync(CancellationToken.None, forceRefresh: true);
+
+        using var cancellation = new CancellationTokenSource();
+        handler.Respond = (_, _) =>
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled<HttpResponseMessage>(cancellation.Token);
+        };
+        bool canceled = false;
+        try { await client.GetCurrentAsync(cancellation.Token, forceRefresh: true); }
+        catch (OperationCanceledException) { canceled = true; }
+        Check(canceled, "Propagar la cancelación de navegación.");
+        Log.Information("Fuera de consulta de clima");
+    }
+    finally { Log.CloseAndFlush(); }
+
+    static object? Value(Serilog.Events.LogEvent item, string key) =>
+        item.Properties.TryGetValue(key, out var property) && property is Serilog.Events.ScalarValue scalar ? scalar.Value : null;
+
+    static string Render(Serilog.Events.LogEvent item)
+    {
+        using var writer = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+        var formatter = new Serilog.Formatting.Display.MessageTemplateTextFormatter("{Message:lj}", System.Globalization.CultureInfo.InvariantCulture);
+        formatter.Format(item, writer);
+        return writer.ToString();
+    }
+
+    var requests = sink.Events.Where(item => item.Properties.ContainsKey("DurationMs")).ToArray();
+    Check(requests.Length == 6 && handler.Calls == 6 && requests.All(item =>
+        Value(item, "Method") as string == "GET" && Value(item, "Resource") as string == "/v1/forecast" &&
+        Value(item, "DurationMs") is long duration && duration >= 0 &&
+        Value(item, "SourceContext") as string == "TrelloNotifier.Services.WeatherClient"),
+        "Usar el mismo esquema de método, ruta, estado y duración del resto de clientes.");
+    Check(requests[0].Level == Serilog.Events.LogEventLevel.Information && Value(requests[0], "StatusCode") is 200 &&
+        Render(requests[0]).Contains("GET /v1/forecast -> 200 ("), "El GET correcto debe verse a nivel INFO.");
+    Check(requests.Skip(1).Take(4).All(item => item.Level == Serilog.Events.LogEventLevel.Warning) &&
+        Value(requests[1], "StatusCode") is 503 && Render(requests[1]).Contains("GET /v1/forecast -> 503 ("),
+        "Conservar y mostrar el código HTTP al fallar.");
+    Check(Value(requests[2], "StatusCode") is null && Value(requests[2], "HttpResult") as string == "sin respuesta" &&
+        Value(requests[3], "Outcome") as string == "tiempo de espera agotado" &&
+        Value(requests[4], "StatusCode") is 200 && Value(requests[4], "Outcome") as string == "respuesta JSON inválida",
+        "Distinguir fallos de red, timeout y una respuesta HTTP correcta con JSON inválido.");
+    Check(requests[5].Level == Serilog.Events.LogEventLevel.Debug &&
+        Value(requests[5], "Outcome") as string == "cancelada por solicitud", "La navegación cancelada no genera una falsa advertencia.");
+    Check(requests.Select(item => Value(item, "WeatherRequestId")).Distinct().Count() == 6 &&
+        !sink.Events.Last().Properties.ContainsKey("WeatherRequestId"), "Correlacionar cada petición y liberar su LogContext.");
+    Check(sink.Events.Any(item => Value(item, "ForceRefresh") is true) && sink.Events.All(item =>
+        !item.RenderMessage().Contains("private-weather") && !item.RenderMessage().Contains("latitude") &&
+        !item.RenderMessage().Contains("12.34567") && !item.RenderMessage().Contains("45.67891") &&
+        !(item.Exception?.ToString().Contains("private-weather") ?? false)),
+        "No exponer ubicación, query, payload ni mensajes originales de excepciones.");
 });
 
 await Run("Clima: solicitudes simultáneas comparten caché y cancelar no publica resultados tardíos", async () =>

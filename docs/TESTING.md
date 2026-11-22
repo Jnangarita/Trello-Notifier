@@ -50,7 +50,10 @@ unidades y timestamp UTC, sensación térmica, condiciones WMO y noche, campos
 opcionales o desconocidos, caché y expiración exacta, refresco manual que fuerza
 HTTP y renueva la caché (también tras fallo), llamadas concurrentes,
 cancelación tardía, coordenadas inválidas, fallos HTTP/red/timeout/JSON, límite de
-respuesta, recuperación tras cinco minutos y logging correlacionado y saneado.
+respuesta, recuperación tras cinco minutos y logging correlacionado y saneado:
+GET, ruta `/v1/forecast`, estado y duración, sin query ni datos de ubicación.
+Verifica INFO al recibir datos, WARN ante HTTP/red/timeout/JSON, cancelación en
+Debug y ausencia de eventos HTTP al devolver la caché.
 No consulta Open-Meteo real ni usa preferencias del usuario.
 
 Revisión WinUI con dobles: abrir Dashboard sin configurar Trello, comprobar carga,
